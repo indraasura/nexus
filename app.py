@@ -108,10 +108,10 @@ def process_documents(uploaded_files):
     if not documents:
         return None
 
-    text_splitter = RecursiveCharacterTextSplitter(chunk_size=1000, chunk_overlap=200)
+    text_splitter = RecursiveCharacterTextSplitter(chunk_size=10000, chunk_overlap=2000) # Determines chunk size and overlap between chunks
     chunks = text_splitter.split_documents(documents)
     
-    embeddings = GoogleGenerativeAIEmbeddings(model="models/embedding-001", transport="rest")
+    embeddings = GoogleGenerativeAIEmbeddings(model="gemini-embedding-001", transport="rest")
     vector_store = FAISS.from_documents(chunks, embeddings)
     return vector_store
 
@@ -153,10 +153,12 @@ if prompt := st.chat_input("Ask a question about your uploaded data..."):
     st.session_state.messages.append({"role": "user", "content": prompt})
 
     if "vector_store" in st.session_state:
-        llm = ChatGoogleGenerativeAI(model="gemini-1.5-flash", temperature=0, transport="rest")
+        llm = ChatGoogleGenerativeAI(model="gemini-2.5-flash", temperature=0, transport="rest")
         
         system_prompt = (
-            "You are a helpful data assistant. Use the provided context to answer the user's question. "
+            "You are a meticulous enterprise data assistant. Use the provided context to answer the user's question. "
+            "CRITICAL INSTRUCTION: When the user asks you to 'list', 'group', or 'show all' items, you MUST output the COMPLETE and exhaustive list from the context. "
+            "Do NOT summarize, do NOT truncate, and do NOT say 'here are a few examples'. Extract and provide every single matching item. "
             "If you don't know the answer based on the context, say you don't know.\n\n"
             "Context: {context}"
         )
@@ -165,7 +167,7 @@ if prompt := st.chat_input("Ask a question about your uploaded data..."):
             ("human", "{input}"),
         ])
         
-        retriever = st.session_state.vector_store.as_retriever()
+        retriever = st.session_state.vector_store.as_retriever(search_kwargs={"k": 50}) # Determines how many chunks are retrieved at once
         
         # The Modern LCEL Pipeline (Replaces the broken .chains module)
         rag_chain = (
