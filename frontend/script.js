@@ -1,4 +1,4 @@
-const API_URL = "http://127.0.0.1:8000"; // Local FastAPI address
+const API_URL = "YOUR_RENDER_URL_GOES_HERE";; // FastAPI address
 
 // Handle file selection display
 document.getElementById('file-upload').addEventListener('change', function (e) {
