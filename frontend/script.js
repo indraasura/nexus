@@ -1,4 +1,4 @@
-const API_URL = "YOUR_RENDER_URL_GOES_HERE";; // FastAPI address
+const API_URL = "https://nexus-backend-service.onrender.com";; // FastAPI address
 
 // Handle file selection display
 document.getElementById('file-upload').addEventListener('change', function (e) {
