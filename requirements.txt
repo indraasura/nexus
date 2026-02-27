@@ -1,7 +1,11 @@
-streamlit
+fastapi
+uvicorn
+python-multipart
 langchain
+langchain-core
 langchain-community
 langchain-google-genai
+langchain-openai
 faiss-cpu
 python-dotenv
 pandas

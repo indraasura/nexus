@@ -1,0 +1,56 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Nexus - Enterprise Data Agent</title>
+    <link rel="stylesheet" href="style.css">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+</head>
+
+<body>
+    <div class="app-container">
+        <aside class="sidebar">
+            <div class="logo">Nexus</div>
+            <div class="upload-section">
+                <h3>Knowledge Base</h3>
+                <input type="file" id="file-upload" multiple accept=".xlsx,.xls,.ppt,.pptx" style="display: none;">
+                <button class="btn secondary" onclick="document.getElementById('file-upload').click()">+ Select
+                    Files</button>
+                <div id="file-list" class="file-list"></div>
+                <button class="btn primary" id="sync-btn" onclick="syncData()">Sync Data to AI</button>
+                <div id="sync-status" class="status-msg"></div>
+            </div>
+        </aside>
+
+        <main class="chat-wrapper">
+            <div id="chat-container" class="chat-container">
+                <div class="message ai">
+                    <div class="bubble">👋 Hello, I'm Nexus. Upload your files in the sidebar and click Sync to begin chatting with your data</div>
+                </div>
+            </div>
+
+            <div class="input-wrapper">
+                <div class="input-box">
+                    <select id="model-select" class="model-dropdown">
+                        <option value="gemini">✨ Gemini (Test)</option>
+                        <option value="openai">🌐 GPT-4o (Prod)</option>
+                    </select>
+                    <input type="text" id="user-input" placeholder="Ask about your data..."
+                        onkeypress="handleKeyPress(event)">
+                    <button id="send-btn" onclick="sendMessage()">
+                        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                            stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                            <line x1="22" y1="2" x2="11" y2="13"></line>
+                            <polygon points="22 2 15 22 11 13 2 9 22 2"></polygon>
+                        </svg>
+                    </button>
+                </div>
+            </div>
+        </main>
+    </div>
+    <script src="script.js"></script>
+</body>
+
+</html>
