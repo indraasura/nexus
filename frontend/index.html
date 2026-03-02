@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Enterprise Data Platform</title>
+    <title>Nexus - RAG for Enterprises</title>
     <link rel="stylesheet" href="style.css">
     <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
@@ -25,16 +25,16 @@
     <div id="view-app" class="view">
 
         <aside class="sidebar">
-            <h2 style="padding: 12px 20px; margin-bottom: 12px; font-weight: 500;">Eizou Platform</h2>
-            <nav id="nav-menu" style="display: flex; flex-direction: column; height: 100%;">
+            <h2 style="padding: 12px 20px; margin-bottom: 12px; font-weight: 500;">Nexus</h2>
+            <nav id="nav-menu" style="display: flex; flex-direction: column; height: 100vh; justify-content: space-between;">
                 <div class="nav-item active" onclick="switchTab('chat')">
-                    💬 Data Analysis
+                    Analyze
                 </div>
                 <div class="nav-item admin-only" onclick="switchTab('admin')" style="display:none;">
-                    ⚙️ Administration
+                    Administration
                 </div>
                 <div class="nav-item" onclick="logout()" style="margin-top: auto;">
-                    🚪 Sign Out
+                    Logout
                 </div>
             </nav>
         </aside>
@@ -45,7 +45,7 @@
                 <div style="color: var(--text-secondary); font-weight: 500;" id="user-badge"></div>
             </div>
 
-            <div id="tab-chat" class="tab-content" style="display: flex; flex-direction: column; flex: 1;">
+            <div id="tab-chat" class="tab-content">
                 <div id="chat-container" class="chat-container">
                     <div class="message ai">
                         <div class="bubble">Select a project from the top menu to begin analyzing data.</div>
@@ -74,51 +74,56 @@
             <div id="tab-admin" class="tab-content admin-panel" style="display: none;">
                 <h1>Platform Administration</h1>
 
-                <div class="card">
-                    <h2>1. Create New Project</h2>
-                    <div class="form-group">
-                        <input type="text" id="new-project-name" placeholder="Enter Project Name">
-                        <button class="btn-pill" onclick="createProject()">Create Project</button>
+                <div class="card-container">
+                    <div class="card">
+                        <h2>1. Create New Project</h2>
+                        <div class="form-group">
+                            <input type="text" id="new-project-name" placeholder="Enter Project Name">
+                            <button class="btn-pill" onclick="createProject()">Create Project</button>
+                        </div>
+                    </div>
+
+                    <div class="card">
+                        <h2>2. Provision User Account</h2>
+                        <div class="form-group">
+                            <input type="email" id="new-email" placeholder="Email Address">
+                            <input type="password" id="new-password" placeholder="Password (Min 6 chars)">
+                            <select id="new-role" class="project-selector">
+                                <option value="user">Standard User</option>
+                                <option value="admin">Administrator</option>
+                            </select>
+                            <button class="btn-pill" onclick="createUser()">Provision</button>
+                        </div>
+                    </div>
+
+                    <div class="card">
+                        <h2>3. Manage Access Controls</h2>
+                        <div class="form-group">
+                            <input type="email" id="assign-email" placeholder="User Email">
+                            <select id="assign-project-id" class="project-selector"></select>
+                            <button class="btn-pill" onclick="assignUser()">Grant Access</button>
+                        </div>
+                    </div>
+
+                    <div class="card">
+                        <h2>4. Upload Knowledge Base</h2>
+                        <div class="form-group">
+                            <select id="upload-project-id" class="project-selector"></select>
+                            <select id="upload-model" class="project-selector">
+                                <option value="openai">🌐 OpenAI</option>
+                                <option value="gemini">✨ Gemini</option>
+                            </select>
+                            <input type="file" id="file-upload" multiple accept=".xlsx,.csv,.ppt,.pptx, .pdf"
+                                style="background: var(--bg-main);">
+                            <button class="btn-pill" onclick="uploadData()" id="upload-btn">Sync to Vector DB</button>
+                        </div>
+                        <div id="upload-status"
+                            style="margin-top: 12px; font-weight: 500; color: var(--text-secondary);">
+                        </div>
                     </div>
                 </div>
 
-                <div class="card">
-                    <h2>2. Provision User Account</h2>
-                    <div class="form-group">
-                        <input type="email" id="new-email" placeholder="Email Address">
-                        <input type="password" id="new-password" placeholder="Password (Min 6 chars)">
-                        <select id="new-role" style="max-width: 150px;">
-                            <option value="user">Standard User</option>
-                            <option value="admin">Administrator</option>
-                        </select>
-                        <button class="btn-pill" onclick="createUser()">Provision</button>
-                    </div>
-                </div>
 
-                <div class="card">
-                    <h2>3. Manage Access Controls</h2>
-                    <div class="form-group">
-                        <input type="email" id="assign-email" placeholder="User Email">
-                        <select id="assign-project-id" style="max-width: 250px;"></select>
-                        <button class="btn-pill" onclick="assignUser()">Grant Access</button>
-                    </div>
-                </div>
-
-                <div class="card">
-                    <h2>4. Upload Knowledge Base</h2>
-                    <div class="form-group">
-                        <select id="upload-project-id" style="max-width: 250px;"></select>
-                        <select id="upload-model" style="max-width: 150px;">
-                            <option value="openai">🌐 OpenAI</option>
-                            <option value="gemini">✨ Gemini</option>
-                        </select>
-                        <input type="file" id="file-upload" multiple accept=".xlsx,.csv,.ppt,.pptx"
-                            style="background: var(--bg-main);">
-                        <button class="btn-pill" onclick="uploadData()" id="upload-btn">Sync to Vector DB</button>
-                    </div>
-                    <div id="upload-status" style="margin-top: 12px; font-weight: 500; color: var(--text-secondary);">
-                    </div>
-                </div>
             </div>
         </main>
     </div>

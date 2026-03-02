@@ -7,6 +7,7 @@ from dotenv import load_dotenv, find_dotenv
 import io
 from pathlib import Path
 from supabase import create_client, Client
+import PyPDF2
 
 # --- LANGCHAIN IMPORTS ---
 from langchain_text_splitters import RecursiveCharacterTextSplitter
@@ -45,6 +46,25 @@ def get_current_user(authorization: str = Header(None)):
     token = authorization.split(" ")[1]
     
     try:
+        # 1. Use a temporary client to validate the token so we don't pollute the global master key
+        temp_client = create_client(os.getenv("SUPABASE_URL"), os.getenv("SUPABASE_KEY"))
+        user_response = temp_client.auth.get_user(token)
+        user_id = user_response.user.id
+        email = user_response.user.email
+        
+        # 2. Use the global master client to fetch the role
+        profile = supabase.table("profiles").select("role").eq("id", user_id).execute()
+        role = profile.data[0]["role"] if profile.data else "user"
+        
+        return {"id": user_id, "email": email, "role": role}
+    except Exception as e:
+        print(f"Auth verification error: {str(e)}")
+        raise HTTPException(status_code=401, detail="Invalid or Expired Token")
+    if not authorization or not authorization.startswith("Bearer "):
+        raise HTTPException(status_code=401, detail="Missing Token")
+    token = authorization.split(" ")[1]
+    
+    try:
         # Verify JWT with Supabase
         user_response = supabase.auth.get_user(token)
         user_id = user_response.user.id
@@ -67,10 +87,13 @@ def require_admin(user: dict = Depends(get_current_user)):
 @app.post("/login")
 def login(email: str = Form(...), password: str = Form(...)):
     try:
-        res = supabase.auth.sign_in_with_password({"email": email, "password": password})
+        # 1. Create a TEMPORARY client just for logging in.
+        # This prevents the global 'supabase' client from losing its Admin privileges!
+        temp_client = create_client(os.getenv("SUPABASE_URL"), os.getenv("SUPABASE_KEY"))
+        res = temp_client.auth.sign_in_with_password({"email": email, "password": password})
         token = res.session.access_token
         
-        # Get role
+        # 2. Use the global, unpolluted admin client to check their role
         profile = supabase.table("profiles").select("role").eq("id", res.user.id).execute()
         role = profile.data[0]["role"] if profile.data else "user"
         
@@ -82,17 +105,19 @@ def login(email: str = Form(...), password: str = Form(...)):
 @app.post("/admin/users")
 def create_user(email: str = Form(...), password: str = Form(...), role: str = Form(...), admin: dict = Depends(require_admin)):
     try:
-        # Create user in Auth using Admin API
-        res = supabase.auth.admin.create_user({
+        # Create a fresh, guaranteed Admin client for this specific action
+        admin_client = create_client(os.getenv("SUPABASE_URL"), os.getenv("SUPABASE_KEY"))
+        
+        res = admin_client.auth.admin.create_user({
             "email": email,
             "password": password,
             "email_confirm": True
         })
         new_user_id = res.user.id
         
-        # Update their role in the profiles table (auto-created by the trigger)
-        supabase.table("profiles").update({"role": role}).eq("id", new_user_id).execute()
-        return {"status": "User created successfully"}
+        # Update their role in the profiles table
+        admin_client.table("profiles").update({"role": role}).eq("id", new_user_id).execute()
+        return {"status": "User provisioned successfully"}
     except Exception as e:
         raise HTTPException(status_code=400, detail=str(e))
 
@@ -123,6 +148,57 @@ def list_users(admin: dict = Depends(require_admin)):
 # --- USER ENDPOINTS ---
 @app.get("/projects")
 def get_user_projects(user: dict = Depends(get_current_user)):
+    print(f"\n--- 🔍 FETCHING PROJECTS FOR: {user['email']} (Role: {user['role']}) ---")
+    
+    try:
+        if user["role"] == "admin":
+            projects = supabase.table("projects").select("*").execute()
+            print(f"✅ Admin Access: Retrieved {len(projects.data)} projects globally.")
+            return {"projects": projects.data}
+        else:
+            # 1. Fetch which projects the user is mapped to
+            assignments = supabase.table("project_users").select("project_id").eq("user_id", user["id"]).execute()
+            print(f"📌 Database Assignments Found: {assignments.data}")
+            
+            if not assignments.data:
+                print("⚠️ User has no mapped projects.")
+                return {"projects": []}
+                
+            # 2. Extract IDs and force them to be INTEGERS so Supabase BIGINT doesn't silently reject them
+            project_ids = [int(a["project_id"]) for a in assignments.data]
+            print(f"🔢 Querying Supabase for Project IDs: {project_ids}")
+            
+            # 3. Fetch the actual project details
+            projects = supabase.table("projects").select("*").in_("id", project_ids).execute()
+            print(f"✅ Retrieved Project Details: {projects.data}\n")
+            
+            return {"projects": projects.data}
+            
+    except Exception as e:
+        print(f"❌ CRITICAL ERROR FETCHING PROJECTS: {str(e)}\n")
+        raise HTTPException(status_code=500, detail=f"Database error: {str(e)}")
+    try:
+        if user["role"] == "admin":
+            projects = supabase.table("projects").select("*").execute()
+            return {"projects": projects.data}
+        else:
+            # 1. Fetch which projects the user is mapped to
+            assignments = supabase.table("project_users").select("project_id").eq("user_id", user["id"]).execute()
+            
+            if not assignments.data:
+                return {"projects": []}
+                
+            # 2. Extract IDs and force them to be strings to prevent serialization crashes
+            project_ids = [str(a["project_id"]) for a in assignments.data]
+            
+            # 3. Fetch the actual project details
+            projects = supabase.table("projects").select("*").in_("id", project_ids).execute()
+            return {"projects": projects.data}
+            
+    except Exception as e:
+        # If it ever crashes again, it will print the exact reason in your terminal
+        print(f"❌ Error fetching projects: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Database error: {str(e)}")
     if user["role"] == "admin":
         projects = supabase.table("projects").select("*").execute()
         return {"projects": projects.data}
@@ -151,6 +227,9 @@ async def upload_files(files: list[UploadFile] = File(...), project_id: int = Fo
         elif ext in ['pptx', 'ppt']:
             prs = Presentation(io.BytesIO(contents))
             raw_text = "\n".join([shape.text for slide in prs.slides for shape in slide.shapes if hasattr(shape, "text")])
+        elif ext == 'pdf':
+            pdf_reader = PyPDF2.PdfReader(io.BytesIO(contents))
+            raw_text = "\n".join([page.extract_text() for page in pdf_reader.pages if page.extract_text()])
         else:
             raw_text = contents.decode('utf-8', errors='ignore')
             
@@ -188,13 +267,27 @@ async def chat(message: str = Form(...), project_id: int = Form(...), model: str
     google_key = os.getenv("GOOGLE_API_KEY")
     openai_key = os.getenv("OPENAI_API_KEY")
     
-    embeddings = GoogleGenerativeAIEmbeddings(model="models/text-embedding-004", google_api_key=google_key, transport="rest") if db_key == "gemini" else OpenAIEmbeddings(model="text-embedding-3-small", openai_api_key=openai_key)
+    embeddings = GoogleGenerativeAIEmbeddings(model="gemini-embedding-001", google_api_key=google_key, transport="rest") if db_key == "gemini" else OpenAIEmbeddings(model="text-embedding-3-small", openai_api_key=openai_key)
     vector_store = FAISS.load_local(save_path, embeddings, allow_dangerous_deserialization=True)
     
     llm = ChatGoogleGenerativeAI(model="gemini-2.5-flash", google_api_key=google_key, temperature=0, transport="rest") if db_key == "gemini" else ChatOpenAI(model="gpt-4o", openai_api_key=openai_key, temperature=0)
-        
+
+
+    # 1. Define the prompt string first
+    system_prompt = (
+            "You are an enterprise data assistant. Answer based on the context. "
+            "CHART INSTRUCTIONS: If the user asks for a graph or chart, you MUST output a valid JSON object "
+            "wrapped in a ```chart ... ``` block. "
+            "The JSON MUST follow this exact structure: "
+            "{{ \"type\": \"bar\", \"data\": {{ \"labels\": [\"A\", \"B\"], \"datasets\": [{{ \"label\": \"Title\", \"data\": [10, 20], \"backgroundColor\": \"#0A56D0\" }}] }}, \"options\": {{ \"responsive\": true }} }} "
+            "Use 'bar', 'line', or 'pie'. Use aesthetic colors. "
+            "If no data is available for a chart, explain why instead of providing an empty block. "
+            "\n\nContext: {context}"
+     )
+
+    # 2. Then pass the variable into the template
     prompt_template = ChatPromptTemplate.from_messages([
-        ("system", "You are an enterprise data assistant. Answer based on the context. If charts are requested, output a JSON array wrapped in a ```chart ``` block for Chart.js. Context: {context}"),
+        ("system", system_prompt),
         ("human", "{input}"),
     ])
     

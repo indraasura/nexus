@@ -1,5 +1,5 @@
-// Change this to your Render URL when deploying (e.g., "https://my-backend.onrender.com")
-const API_URL = "https://nexus-backend-service.onrender.com";
+// Change this to your Render URL when deploying https://nexus-backend-service.onrender.com
+const API_URL = "http://127.0.0.1:8000";
 
 let authToken = null;
 let currentRole = null;
@@ -70,8 +70,17 @@ function switchTab(tabId) {
     document.getElementById('tab-chat').style.display = tabId === 'chat' ? 'flex' : 'none';
     document.getElementById('tab-admin').style.display = tabId === 'admin' ? 'block' : 'none';
 
+    // Clear the active styling from all tabs
     document.querySelectorAll('.nav-item').forEach(el => el.classList.remove('active'));
-    event.currentTarget.classList.add('active');
+
+    // Safely apply the active styling
+    if (window.event && window.event.currentTarget) {
+        // If triggered by a physical mouse click
+        window.event.currentTarget.classList.add('active');
+    } else if (tabId === 'chat') {
+        // If triggered by code (like during a Standard User login)
+        document.querySelectorAll('.nav-item')[0].classList.add('active');
+    }
 }
 
 // --- ADMIN CAPABILITIES ---
@@ -207,8 +216,16 @@ function appendMessage(role, text) {
         const chartId = 'chart-' + Math.random().toString(36).substr(2, 9);
         try {
             const config = JSON.parse(jsonString);
+
+            // FORCE the chart to be fully responsive and stretch to the container
+            if (!config.options) config.options = {};
+            config.options.responsive = true;
+            config.options.maintainAspectRatio = false;
+
             chartConfigs.push({ id: chartId, config: config });
-            return `<div class="chart-container"><canvas id="${chartId}"></canvas></div>`;
+
+            // Remove the inline max-width and increase the height for a cinematic view
+            return `<div class="chart-container" style="position:relative; height:450px; width:100%; background:var(--bg-main); padding:24px; border-radius:16px; border:1px solid var(--border); margin-top: 16px;"><canvas id="${chartId}"></canvas></div>`;
         } catch (e) {
             return `<div style="color:red;">⚠️ AI generated invalid chart data structure.</div>`;
         }

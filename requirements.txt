@@ -13,3 +13,4 @@ tabulate
 python-pptx
 openpyxl
 supabase
+PyPDF2

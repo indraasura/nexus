@@ -118,6 +118,13 @@ body {
     position: relative;
 }
 
+.tab-content {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden; /* This is the magic bullet that forces scrolling */
+}
+
 .header {
     padding: 20px 40px;
     display: flex;
@@ -129,13 +136,14 @@ body {
 
 .project-selector {
     padding: 10px 24px;
-    border-radius: var(--radius-pill);
     border: 1px solid var(--border);
     background: var(--bg-surface);
     font-size: 0.95rem;
     font-weight: 500;
     outline: none;
     cursor: pointer;
+    border-radius: var(--radius-pill);
+    appearance: none;
 }
 
 /* --- Chat Interface --- */
@@ -155,10 +163,12 @@ body {
 
 .message.user {
     align-self: flex-end;
+    max-width: 85%;
 }
 
 .message.ai {
     align-self: flex-start;
+    max-width: 85%;
 }
 
 .bubble {
@@ -171,11 +181,13 @@ body {
 .message.user .bubble {
     background-color: var(--bg-surface);
     border-bottom-right-radius: 4px;
+    max-width: 100%;
 }
 
 .message.ai .bubble {
     background-color: transparent;
     padding: 0;
+    width: 100%;
 }
 
 /* --- Chat Input Box --- */
@@ -241,6 +253,13 @@ body {
     font-weight: 400;
     font-size: 2rem;
     margin-bottom: 16px;
+}
+
+.card-container{
+    display: flex;
+    flex-direction: column;
+    height: 100vh;
+    justify-content: space-between;
 }
 
 .card {
