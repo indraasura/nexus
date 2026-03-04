@@ -18,6 +18,7 @@ from langchain_core.prompts import ChatPromptTemplate
 from langchain_core.documents import Document
 from langchain_core.runnables import RunnablePassthrough
 from langchain_core.output_parsers import StrOutputParser
+from langchain_community.vectorstores import SupabaseVectorStore
 
 load_dotenv(find_dotenv())
 
@@ -213,9 +214,103 @@ def get_user_projects(user: dict = Depends(get_current_user)):
         projects = supabase.table("projects").select("*").in_("id", project_ids).execute()
         return {"projects": projects.data}
 
-# --- AI DATA ENDPOINTS (PERSISTENT MEMORY) ---
+# --- AI DATA ENDPOINTS (CLOUD PERSISTENT MEMORY) ---
 @app.post("/upload")
 async def upload_files(files: list[UploadFile] = File(...), project_id: int = Form(...), model: str = Form(...), admin: dict = Depends(require_admin)):
+    documents = []
+    
+    for file in files:
+        contents = await file.read()
+        ext = file.filename.split('.')[-1].lower()
+        
+        # 1. --- SAVE THE PHYSICAL FILE TO SUPABASE STORAGE ---
+        # Create a clean path (e.g., "project_1/financials.pdf")
+        file_path = f"project_{project_id}/{file.filename}"
+        
+        try:
+            # Upload the raw bytes to the bucket (upsert=True overwrites if file with same name exists)
+            supabase.storage.from_("project_files").upload(file_path, contents, file_options={"upsert": "true"})
+            
+            # Get the public download URL
+            file_url = supabase.storage.from_("project_files").get_public_url(file_path)
+            
+            # Save the record to our SQL table
+            supabase.table("project_files").insert({
+                "project_id": project_id,
+                "file_name": file.filename,
+                "file_url": file_url
+            }).execute()
+        except Exception as e:
+            print(f"⚠️ Failed to store physical file {file.filename}: {str(e)}")
+            # We print the error but continue so the AI can still vectorize the data!
+
+        # 2. --- PARSE TEXT FOR THE AI ---
+        if ext in ['xlsx', 'xls']:
+            raw_text = pd.read_excel(io.BytesIO(contents)).to_markdown()
+        elif ext == 'csv':
+            raw_text = pd.read_csv(io.BytesIO(contents)).to_markdown()
+        elif ext in ['pptx', 'ppt']:
+            prs = Presentation(io.BytesIO(contents))
+            raw_text = "\n".join([shape.text for slide in prs.slides for shape in slide.shapes if hasattr(shape, "text")])
+        elif ext == 'pdf':
+            pdf_reader = PyPDF2.PdfReader(io.BytesIO(contents))
+            raw_text = "\n".join([page.extract_text() for page in pdf_reader.pages if page.extract_text()])
+        else:
+            raw_text = contents.decode('utf-8', errors='ignore')
+            
+        if raw_text:
+            documents.append(Document(page_content=raw_text, metadata={"source": file.filename, "project_id": project_id}))
+            
+    if not documents:
+        raise HTTPException(status_code=400, detail="No readable text found.")
+
+    # 3. --- VECTORIZE AND SAVE TO AI MEMORY ---
+    text_splitter = RecursiveCharacterTextSplitter(chunk_size=10000, chunk_overlap=1000)
+    chunks = text_splitter.split_documents(documents)
+    
+    google_key = os.getenv("GOOGLE_API_KEY")
+    openai_key = os.getenv("OPENAI_API_KEY")
+    
+    if "gemini" in model.lower():
+        embeddings = GoogleGenerativeAIEmbeddings(model="gemini-embedding-001", google_api_key=google_key, transport="rest")
+    else:
+        embeddings = OpenAIEmbeddings(
+            model="text-embedding-3-small", 
+            dimensions=768, 
+            openai_api_key=openai_key,
+            max_retries=5,
+            chunk_size=100
+        )
+        
+   # --- SURGICAL VECTOR INSERTION ---
+    try:
+        # 1. Extract the raw text and metadata from LangChain's chunk objects
+        texts = [chunk.page_content for chunk in chunks]
+        metadatas = [chunk.metadata for chunk in chunks]
+        
+        # 2. Generate the embeddings (Let LangChain generate the massive 3072 array if it wants to)
+        raw_vectors = embeddings.embed_documents(texts)
+        
+        # 3. THE SLICE: Force every single vector to be exactly 768 numbers long
+        truncated_vectors = [vec[:768] for vec in raw_vectors]
+        
+        # 4. Package them into a clean dictionary format for Supabase
+        records = []
+        for text, meta, vec in zip(texts, metadatas, truncated_vectors):
+            records.append({
+                "content": text,
+                "metadata": meta,
+                "embedding": vec
+            })
+            
+        # 5. Insert directly into the database, completely bypassing LangChain's buggy wrapper!
+        supabase.table("project_documents").insert(records).execute()
+        
+    except Exception as e:
+        print(f"Vector upload error: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Failed to upload to vector database: {str(e)}")
+    
+    return {"status": "success", "message": f"Files and AI Data permanently saved to Project {project_id}."}
     documents = []
     for file in files:
         contents = await file.read()
@@ -258,39 +353,69 @@ def format_docs(docs): return "\n\n".join(doc.page_content for doc in docs)
 
 @app.post("/chat")
 async def chat(message: str = Form(...), project_id: int = Form(...), model: str = Form(...), user: dict = Depends(get_current_user)):
-    db_key = "gemini" if "gemini" in model.lower() else "openai"
-    save_path = str(STORAGE_DIR / f"project_{project_id}_{db_key}")
-    
-    if not os.path.exists(save_path):
-        raise HTTPException(status_code=400, detail="No data uploaded for this project yet.")
-        
     google_key = os.getenv("GOOGLE_API_KEY")
     openai_key = os.getenv("OPENAI_API_KEY")
     
-    embeddings = GoogleGenerativeAIEmbeddings(model="gemini-embedding-001", google_api_key=google_key, transport="rest") if db_key == "gemini" else OpenAIEmbeddings(model="text-embedding-3-small", openai_api_key=openai_key)
-    vector_store = FAISS.load_local(save_path, embeddings, allow_dangerous_deserialization=True)
+    if "gemini" in model.lower():
+        embeddings = GoogleGenerativeAIEmbeddings(model="gemini-embedding-001", google_api_key=google_key, transport="rest")
+        llm = ChatGoogleGenerativeAI(model="gemini-2.5-flash", google_api_key=google_key, temperature=0, transport="rest")
+    else:
+        embeddings = OpenAIEmbeddings(model="text-embedding-3-small", dimensions=768, openai_api_key=openai_key)
+        llm = ChatOpenAI(model="gpt-4o", openai_api_key=openai_key, temperature=0)
     
-    llm = ChatGoogleGenerativeAI(model="gemini-2.5-flash", google_api_key=google_key, temperature=0, transport="rest") if db_key == "gemini" else ChatOpenAI(model="gpt-4o", openai_api_key=openai_key, temperature=0)
-
-
-    # 1. Define the prompt string first
+    try:
+        print(f"\n--- 🔍 SEARCHING DB FOR PROJECT ID: {project_id} ---")
+        
+        # 1. Convert the user's message into numbers
+        query_embedding = embeddings.embed_query(message)
+        
+        # 2. THE CHAT SLICE FIX: We sliced the vectors during upload, we MUST slice the search vector too!
+        query_embedding = query_embedding[:768]
+        
+        # 3. Call our Supabase SQL function directly, forcing project_id to be a strict integer
+        rpc_response = supabase.rpc(
+            "match_project_documents",
+            {
+                "query_embedding": query_embedding,
+                "match_count": 50,
+                "filter": {"project_id": int(project_id)} 
+            }
+        ).execute()
+        
+        # 4. Extract the text chunks and print the diagnostic results
+        chunks = rpc_response.data
+        print(f"✅ Found {len(chunks)} matching chunks in the database.")
+        
+        context_text = "\n\n".join([row["content"] for row in chunks])
+        
+        if not context_text.strip():
+            print("⚠️ WARNING: Database returned 0 chunks. The AI context is completely empty!")
+            
+    except Exception as e:
+        print(f"Database search error: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Failed to search database: {str(e)}")
+    
     system_prompt = (
-            "You are an enterprise data assistant. Answer based on the context. "
-            "CHART INSTRUCTIONS: If the user asks for a graph or chart, you MUST output a valid JSON object "
-            "wrapped in a ```chart ... ``` block. "
-            "The JSON MUST follow this exact structure: "
-            "{{ \"type\": \"bar\", \"data\": {{ \"labels\": [\"A\", \"B\"], \"datasets\": [{{ \"label\": \"Title\", \"data\": [10, 20], \"backgroundColor\": \"#0A56D0\" }}] }}, \"options\": {{ \"responsive\": true }} }} "
-            "Use 'bar', 'line', or 'pie'. Use aesthetic colors. "
-            "If no data is available for a chart, explain why instead of providing an empty block. "
-            "\n\nContext: {context}"
-     )
+        "You are an enterprise data assistant. Answer based on the context. "
+        "CHART INSTRUCTIONS: If the user asks for a graph or chart, you MUST output a valid JSON object "
+        "wrapped in a ```chart ... ``` block. "
+        "The JSON MUST follow this exact structure: "
+        "{{ \"type\": \"bar\", \"data\": {{ \"labels\": [\"A\", \"B\"], \"datasets\": [{{ \"label\": \"Title\", \"data\": [10, 20], \"backgroundColor\": \"#0A56D0\" }}] }}, \"options\": {{ \"responsive\": true }} }} "
+        "Use 'bar', 'line', or 'pie'. Use aesthetic colors. "
+        "If no data is available for a chart, explain why instead of providing an empty block. "
+        "\n\nContext: {context}"
+    )
 
-    # 2. Then pass the variable into the template
     prompt_template = ChatPromptTemplate.from_messages([
         ("system", system_prompt),
         ("human", "{input}"),
     ])
     
-    rag_chain = ({"context": vector_store.as_retriever(search_kwargs={"k": 50}) | format_docs, "input": RunnablePassthrough()} | prompt_template | llm | StrOutputParser())
+    rag_chain = prompt_template | llm | StrOutputParser()
     
-    return {"answer": rag_chain.invoke(message)}
+    try:
+        answer = rag_chain.invoke({"context": context_text, "input": message})
+        return {"answer": answer}
+    except Exception as e:
+        print(f"Chat execution error: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Failed to generate AI response: {str(e)}")
