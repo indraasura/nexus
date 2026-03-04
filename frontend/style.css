@@ -678,3 +678,128 @@ body {
 .input-box .nexus-dropdown-wrapper.open .nexus-dropdown-options {
     transform: translateY(0);
 }
+
+/* --- VOICE MODE UI --- */
+.icon-btn {
+    background: transparent;
+    border: none;
+    color: var(--text-secondary);
+    cursor: pointer;
+    padding: 8px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: all 0.2s ease;
+    margin-right: 8px;
+}
+
+.icon-btn:hover {
+    background: var(--bg-surface);
+    color: var(--accent);
+}
+
+.voice-overlay {
+    position: fixed;
+    top: 0; left: 0; right: 0; bottom: 0;
+    background: rgba(15, 15, 20, 0.95);
+    backdrop-filter: blur(10px);
+    z-index: 9999;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    color: white;
+}
+
+.close-voice-btn {
+    position: absolute;
+    top: 32px; right: 32px;
+    background: transparent;
+    border: none;
+    color: white;
+    font-size: 1.5rem;
+    cursor: pointer;
+    opacity: 0.7;
+    transition: opacity 0.2s;
+}
+
+.close-voice-btn:hover { opacity: 1; }
+
+.voice-container {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    text-align: center;
+    gap: 40px;
+}
+
+#voice-status {
+    font-size: 1.2rem;
+    font-weight: 500;
+    letter-spacing: 2px;
+    text-transform: uppercase;
+    color: rgba(255,255,255,0.6);
+}
+
+#voice-transcript {
+    font-size: 1.5rem;
+    max-width: 600px;
+    min-height: 60px;
+    line-height: 1.4;
+    font-weight: 400;
+}
+
+/* --- THE SPHERE & ANIMATIONS --- */
+.sphere-wrapper {
+    position: relative;
+    width: 200px; height: 200px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    margin-top: 40px;
+}
+
+.voice-sphere {
+    width: 120px; height: 120px;
+    border-radius: 50%;
+    background: linear-gradient(135deg, #4285F4, #A13FF4);
+    filter: blur(8px);
+    transition: all 0.4s ease;
+}
+
+/* State 1: Listening (Slow, calm breathing) */
+.voice-sphere.listening {
+    animation: breathe 3s infinite ease-in-out;
+    background: linear-gradient(135deg, rgba(255,255,255,0.8), rgba(255,255,255,0.4));
+}
+
+/* State 2: Thinking (Spinning & Pulsing) */
+.voice-sphere.thinking {
+    animation: think 1.5s infinite linear;
+    background: linear-gradient(135deg, #4285F4, #A13FF4, #4285F4);
+    background-size: 200% 200%;
+}
+
+/* State 3: Speaking (Rapid, fluctuating modulation) */
+.voice-sphere.speaking {
+    animation: speak 0.4s infinite alternate ease-in-out;
+    background: linear-gradient(135deg, #4285F4, #0A56D0);
+}
+
+@keyframes breathe {
+    0% { transform: scale(1); opacity: 0.8; }
+    50% { transform: scale(1.15); opacity: 1; }
+    100% { transform: scale(1); opacity: 0.8; }
+}
+
+@keyframes think {
+    0% { transform: rotate(0deg) scale(1); background-position: 0% 50%; }
+    50% { transform: rotate(180deg) scale(0.9); background-position: 100% 50%; }
+    100% { transform: rotate(360deg) scale(1); background-position: 0% 50%; }
+}
+
+@keyframes speak {
+    0% { transform: scale(1); filter: blur(8px); }
+    100% { transform: scale(1.3); filter: blur(12px); box-shadow: 0 0 40px rgba(66, 133, 244, 0.6); }
+}

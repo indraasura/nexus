@@ -540,5 +540,165 @@ switchTab = function(tabId) {
     }
 };
 
+// --- VOICE ENGINE ---
+let isVoiceModeActive = false;
+let recognition = null;
+let synth = window.speechSynthesis;
+
+// Initialize Speech Recognition
+if ('webkitSpeechRecognition' in window) {
+    recognition = new webkitSpeechRecognition();
+    recognition.continuous = false; // Stop after they finish a sentence
+    recognition.interimResults = true; // Show words as they speak
+    recognition.lang = 'en-US';
+} else {
+    console.warn("Speech recognition not supported in this browser.");
+}
+
+function toggleVoiceMode() {
+    if (!recognition) {
+        alert("Voice mode is not supported in this browser. Please use Chrome or Edge.");
+        return;
+    }
+
+    const overlay = document.getElementById('voice-overlay');
+    isVoiceModeActive = !isVoiceModeActive;
+
+    if (isVoiceModeActive) {
+        overlay.style.display = 'flex';
+        startListening();
+    } else {
+        overlay.style.display = 'none';
+        recognition.stop();
+        synth.cancel(); // Stop AI speaking
+    }
+}
+
+function setVoiceState(state, text) {
+    const sphere = document.getElementById('voice-sphere');
+    const statusText = document.getElementById('voice-status');
+    const transcriptText = document.getElementById('voice-transcript');
+
+    // Reset classes
+    sphere.className = 'voice-sphere';
+    sphere.classList.add(state);
+
+    if (state === 'listening') statusText.innerText = "Listening...";
+    if (state === 'thinking') statusText.innerText = "Thinking...";
+    if (state === 'speaking') statusText.innerText = "Speaking...";
+    
+    if (text) transcriptText.innerText = text;
+}
+
+function startListening() {
+    if (!isVoiceModeActive) return;
+    synth.cancel(); // Ensure AI stops talking if we start listening
+    setVoiceState('listening', "I'm listening...");
+    
+    try {
+        recognition.start();
+    } catch (e) { console.log("Recognition already started"); }
+}
+
+// 1. As the user speaks, update the text on screen
+recognition.onresult = (event) => {
+    let interimTranscript = '';
+    let finalTranscript = '';
+
+    for (let i = event.resultIndex; i < event.results.length; ++i) {
+        if (event.results[i].isFinal) {
+            finalTranscript += event.results[i][0].transcript;
+        } else {
+            interimTranscript += event.results[i][0].transcript;
+        }
+    }
+    document.getElementById('voice-transcript').innerText = finalTranscript || interimTranscript;
+};
+
+// 2. When the user stops speaking, send it to the backend
+recognition.onend = () => {
+    if (!isVoiceModeActive) return;
+    
+    const finalQuestion = document.getElementById('voice-transcript').innerText;
+    
+    // If they didn't say anything, just start listening again
+    if (finalQuestion === "I'm listening..." || finalQuestion.trim() === "") {
+        startListening();
+        return;
+    }
+
+    // Send the voice query to the AI
+    processVoiceQuery(finalQuestion);
+};
+
+// 3. Send to API and handle response
+async function processVoiceQuery(question) {
+    setVoiceState('thinking', question);
+    
+    const projectId = document.getElementById('project-selector').value;
+    if (!projectId) {
+        speakResponse("Please select a project first.");
+        return;
+    }
+
+    const fd = new FormData();
+    fd.append("message", question);
+    fd.append("project_id", projectId);
+    fd.append("model", document.getElementById('model-select').value || "gemini-2.5-flash");
+
+    try {
+        const res = await fetch(`${API_BASE_URL}/chat`, {
+            method: "POST",
+            headers: { "Authorization": `Bearer ${localStorage.getItem('nexus_token')}` },
+            body: fd
+        });
+
+        const data = await res.json();
+        
+        // Inject into normal chat history so it's saved
+        appendMessage('user', question);
+        appendMessage('ai', data.answer);
+        
+        // Speak the answer out loud
+        speakResponse(data.answer);
+
+    } catch (error) {
+        speakResponse("Sorry, I encountered an error checking the database.");
+    }
+}
+
+// 4. Clean text and speak it
+function speakResponse(markdownText) {
+    if (!isVoiceModeActive) return;
+    
+    // 1. Force the variable to be a string (clears Type warnings)
+    const safeText = markdownText ? markdownText.toString() : "";
+    
+    // 2. Build the exact same regex using strings (bypasses IDE highlighting glitches)
+    const formatRegex = new RegExp('[*#_`~]', 'g');
+    const citeRegex = new RegExp('\\', 'g');
+    
+    // 3. Execute the clean
+    const cleanText = safeText.replace(formatRegex, '').replace(citeRegex, '');
+    
+    setVoiceState('speaking', cleanText);
+    
+    const utterance = new SpeechSynthesisUtterance(cleanText);
+    
+    // Optional: Pick a better voice if available
+    const voices = synth.getVoices();
+    const googleVoice = voices.find(v => v.name.includes('Google US English') || v.name.includes('Samantha'));
+    if (googleVoice) utterance.voice = googleVoice;
+    
+    utterance.rate = 1.05; // Slightly faster sounds more natural
+    
+    // 5. When the AI finishes talking, go back to listening!
+    utterance.onend = () => {
+        if (isVoiceModeActive) startListening();
+    };
+    
+    synth.speak(utterance);
+}
+
 // Ensure this runs when the page loads
 document.addEventListener('DOMContentLoaded', initializeNexusDropdowns);

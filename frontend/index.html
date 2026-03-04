@@ -82,7 +82,11 @@
                             <option value="gemini-2.5-pro">✨ Gemini 2.5 Pro</option>
                             <option value="openai">🧠 OpenAI GPT-4o</option>
                         </select>
-
+                        
+                        <button class="icon-btn" onclick="toggleVoiceMode()" title="Voice Mode">
+                            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2a3 3 0 0 0-3 3v7a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3Z"></path><path d="M19 10v2a7 7 0 0 1-14 0v-2"></path><line x1="12" y1="19" x2="12" y2="22"></line></svg>
+                        </button>
+                        
                         <input type="text" id="user-input" placeholder="Ask a question about the project data..."
                             onkeypress="if(event.key === 'Enter') sendChat()">
                         <button class="send-btn" onclick="sendChat()">
@@ -230,6 +234,19 @@
 
             </div>
         </main>
+    </div>
+
+    <div id="voice-overlay" class="voice-overlay" style="display: none;">
+        <button class="close-voice-btn" onclick="toggleVoiceMode()">✕</button>
+        
+        <div class="voice-container">
+            <h3 id="voice-status">Listening...</h3>
+            <p id="voice-transcript">Say something about your project.</p>
+            
+            <div class="sphere-wrapper">
+                <div id="voice-sphere" class="voice-sphere listening"></div>
+            </div>
+        </div>
     </div>
 
     <script src="script.js"></script>
