@@ -71,7 +71,16 @@ function switchTab(tabId) {
     document.getElementById('tab-admin').style.display = tabId === 'admin' ? 'block' : 'none';
 
     // Clear the active styling from all tabs
+    document.querySelectorAll('.tab-content').forEach(t => t.style.display = 'none');
     document.querySelectorAll('.nav-item').forEach(el => el.classList.remove('active'));
+
+    document.getElementById(`tab-${tabId}`).style.display = 'block';
+    event.currentTarget.classList.add('active');
+    
+    // THE TRIGGER: Load data when admin tab opens
+    if (tabId === 'admin') {
+        loadAdminData();
+    }
 
     // Safely apply the active styling
     if (window.event && window.event.currentTarget) {
@@ -370,6 +379,166 @@ function initializeNexusDropdowns() {
         document.querySelectorAll('.nexus-dropdown-wrapper').forEach(w => w.classList.remove('open'));
     });
 }
+
+// --- Admin Panel Tab Switching ---
+function switchAdminTab(tabName) {
+    // 1. Remove active class from all tabs
+    document.querySelectorAll('.admin-tab').forEach(tab => tab.classList.remove('active'));
+    // 2. Hide all sections
+    document.querySelectorAll('.admin-section').forEach(sec => sec.style.display = 'none');
+
+    // 3. Activate the clicked tab and show the corresponding section
+    document.querySelector(`.admin-tab[onclick="switchAdminTab('${tabName}')"]`).classList.add('active');
+
+    const targetSection = document.getElementById(`admin-sec-${tabName}`);
+    if (targetSection) {
+        targetSection.style.display = 'block';
+    }
+}
+
+// --- ADMIN DATA LOADERS ---
+async function loadAdminData() {
+    await Promise.all([
+        loadAdminProjects(),
+        loadAdminUsers(),
+        loadAdminDocuments()
+    ]);
+}
+
+async function loadAdminProjects() {
+    try {
+        const res = await apiCall('/projects', { method: 'GET' });
+        const data = await res.json();
+        const tbody = document.getElementById('admin-project-list');
+        tbody.innerHTML = '';
+        
+        if (data.projects) {
+            data.projects.forEach(p => {
+                tbody.innerHTML += `
+                    <tr>
+                        <td>${p.id}</td>
+                        <td>${p.name}</td>
+                        <td style="text-align: right;">
+                            <button class="action-btn" onclick="editProject(${p.id}, '${p.name}')">Edit</button>
+                            <button class="action-btn danger" onclick="deleteProject(${p.id})">Delete</button>
+                        </td>
+                    </tr>
+                `;
+            });
+        }
+    } catch (e) { console.error("Failed to load projects", e); }
+}
+
+async function loadAdminUsers() {
+    try {
+        const res = await apiCall('/admin/list_users', { method: 'GET' });
+        const data = await res.json();
+        const tbody = document.getElementById('admin-user-list');
+        tbody.innerHTML = '';
+        
+        if (data.users) {
+            data.users.forEach(u => {
+                const roleClass = u.role === 'admin' ? 'admin' : '';
+                tbody.innerHTML += `
+                    <tr>
+                        <td>${u.email}</td>
+                        <td><span class="role-badge ${roleClass}">${u.role.toUpperCase()}</span></td>
+                        <td>Managed via DB</td>
+                        <td style="text-align: right;">
+                            <button class="action-btn" onclick="toggleUserRole('${u.id}', '${u.role}')">Toggle Role</button>
+                            <button class="action-btn danger" onclick="deleteUser('${u.id}')">Delete</button>
+                        </td>
+                    </tr>
+                `;
+            });
+        }
+    } catch (e) { console.error("Failed to load users", e); }
+}
+
+async function loadAdminDocuments() {
+    try {
+        const res = await apiCall('/admin/files', { method: 'GET' });
+        const data = await res.json();
+        const tbody = document.getElementById('admin-document-list');
+        tbody.innerHTML = '';
+        
+        if (data.files) {
+            data.files.forEach(f => {
+                const date = new Date(f.uploaded_at).toLocaleDateString();
+                tbody.innerHTML += `
+                    <tr>
+                        <td><a href="${f.file_url}" target="_blank" style="color: var(--accent); text-decoration: none;">${f.file_name}</a></td>
+                        <td>Project ${f.project_id}</td>
+                        <td>${date}</td>
+                        <td style="text-align: right;">
+                            <button class="action-btn danger" onclick="deleteDocument(${f.id})">Delete</button>
+                        </td>
+                    </tr>
+                `;
+            });
+        }
+    } catch (e) { console.error("Failed to load documents", e); }
+}
+
+// --- ADMIN ACTIONS ---
+async function deleteProject(id) {
+    if (!confirm("Are you sure? This will delete the project and cascade-delete all associated files and access mappings.")) return;
+    await apiCall(`/admin/projects/${id}`, { method: 'DELETE' });
+    loadAdminData(); // Refresh table
+    fetchProjects(); // Refresh dropdowns
+}
+
+async function editProject(id, currentName) {
+    const newName = prompt("Enter new project name:", currentName);
+    if (!newName || newName === currentName) return;
+    
+    const fd = new FormData();
+    fd.append("name", newName);
+    await apiCall(`/admin/projects/${id}`, { method: 'PUT', body: fd });
+    loadAdminData();
+    fetchProjects();
+}
+
+async function deleteUser(id) {
+    if (!confirm("Are you sure you want to permanently delete this user?")) return;
+    await apiCall(`/admin/users/${id}`, { method: 'DELETE' });
+    loadAdminData();
+}
+
+async function toggleUserRole(id, currentRole) {
+    const newRole = currentRole === 'admin' ? 'user' : 'admin';
+    if (!confirm(`Change user role to ${newRole.toUpperCase()}?`)) return;
+    
+    const fd = new FormData();
+    fd.append("role", newRole);
+    await apiCall(`/admin/users/${id}/role`, { method: 'PUT', body: fd });
+    loadAdminData();
+}
+
+async function deleteDocument(id) {
+    if (!confirm("Delete this document from the storage bucket and database?")) return;
+    await apiCall(`/admin/files/${id}`, { method: 'DELETE' });
+    loadAdminData();
+}
+
+// --- Mobile Sidebar Controls ---
+function toggleSidebar() {
+    const sidebar = document.querySelector('.sidebar');
+    const overlay = document.getElementById('sidebar-overlay');
+    
+    sidebar.classList.toggle('open');
+    overlay.classList.toggle('active');
+}
+
+// Auto-close sidebar when switching tabs on mobile
+const originalSwitchTab = switchTab;
+switchTab = function(tabId) {
+    originalSwitchTab(tabId);
+    if (window.innerWidth <= 768) {
+        document.querySelector('.sidebar').classList.remove('open');
+        document.getElementById('sidebar-overlay').classList.remove('active');
+    }
+};
 
 // Ensure this runs when the page loads
 document.addEventListener('DOMContentLoaded', initializeNexusDropdowns);

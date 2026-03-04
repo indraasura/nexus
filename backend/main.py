@@ -355,21 +355,28 @@ def format_docs(docs): return "\n\n".join(doc.page_content for doc in docs)
 async def chat(message: str = Form(...), project_id: int = Form(...), model: str = Form(...), user: dict = Depends(get_current_user)):
     google_key = os.getenv("GOOGLE_API_KEY")
     openai_key = os.getenv("OPENAI_API_KEY")
+    openrouter_key = os.getenv("OPENROUTER_API_KEY")
     
+    # --- DYNAMIC MODEL ROUTING ---
     if "gemini" in model.lower():
+        # Vectors always use the same embedding model
         embeddings = GoogleGenerativeAIEmbeddings(model="gemini-embedding-001", google_api_key=google_key, transport="rest")
-        llm = ChatGoogleGenerativeAI(model="gemini-2.5-flash", google_api_key=google_key, temperature=0, transport="rest")
+        # Pass the exact model string from the frontend directly to LangChain
+        llm = ChatGoogleGenerativeAI(model=model, google_api_key=google_key, temperature=0, transport="rest")
+    
     else:
+        # OpenAI setup with forced dimension compression
         embeddings = OpenAIEmbeddings(model="text-embedding-3-small", dimensions=768, openai_api_key=openai_key)
         llm = ChatOpenAI(model="gpt-4o", openai_api_key=openai_key, temperature=0)
     
+    # --- RAG RETRIEVAL (BYPASSING LANGCHAIN) ---
     try:
-        print(f"\n--- 🔍 SEARCHING DB FOR PROJECT ID: {project_id} ---")
+        print(f"\n--- 🔍 SEARCHING DB FOR PROJECT ID: {project_id} (Model: {model}) ---")
         
         # 1. Convert the user's message into numbers
         query_embedding = embeddings.embed_query(message)
         
-        # 2. THE CHAT SLICE FIX: We sliced the vectors during upload, we MUST slice the search vector too!
+        # 2. THE CHAT SLICE FIX: Ensure the search vector is exactly 768 dimensions
         query_embedding = query_embedding[:768]
         
         # 3. Call our Supabase SQL function directly, forcing project_id to be a strict integer
@@ -395,6 +402,7 @@ async def chat(message: str = Form(...), project_id: int = Form(...), model: str
         print(f"Database search error: {str(e)}")
         raise HTTPException(status_code=500, detail=f"Failed to search database: {str(e)}")
     
+    # --- AI GENERATION ---
     system_prompt = (
         "You are an enterprise data assistant. Answer based on the context. "
         "CHART INSTRUCTIONS: If the user asks for a graph or chart, you MUST output a valid JSON object "
@@ -419,3 +427,63 @@ async def chat(message: str = Form(...), project_id: int = Form(...), model: str
     except Exception as e:
         print(f"Chat execution error: {str(e)}")
         raise HTTPException(status_code=500, detail=f"Failed to generate AI response: {str(e)}")
+
+# --- NEW ADMIN ENDPOINTS (EDIT & DELETE) ---
+
+@app.get("/admin/files")
+def list_files(admin: dict = Depends(require_admin)):
+    try:
+        files = supabase.table("project_files").select("*").execute()
+        return {"files": files.data}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.delete("/admin/projects/{project_id}")
+def delete_project(project_id: int, admin: dict = Depends(require_admin)):
+    try:
+        supabase.table("projects").delete().eq("id", project_id).execute()
+        return {"status": "Project deleted"}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.put("/admin/projects/{project_id}")
+def edit_project(project_id: int, name: str = Form(...), admin: dict = Depends(require_admin)):
+    try:
+        supabase.table("projects").update({"name": name}).eq("id", project_id).execute()
+        return {"status": "Project updated"}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.delete("/admin/users/{user_id}")
+def delete_user(user_id: str, admin: dict = Depends(require_admin)):
+    try:
+        # Delete from Auth completely using the master client
+        supabase.auth.admin.delete_user(user_id)
+        # Delete from profiles table
+        supabase.table("profiles").delete().eq("id", user_id).execute()
+        return {"status": "User deleted"}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.put("/admin/users/{user_id}/role")
+def update_user_role(user_id: str, role: str = Form(...), admin: dict = Depends(require_admin)):
+    try:
+        supabase.table("profiles").update({"role": role}).eq("id", user_id).execute()
+        return {"status": "Role updated"}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.delete("/admin/files/{file_id}")
+def delete_file(file_id: int, admin: dict = Depends(require_admin)):
+    try:
+        # 1. Get file details to remove from storage bucket
+        file_record = supabase.table("project_files").select("*").eq("id", file_id).execute()
+        if file_record.data:
+            path = f"project_{file_record.data[0]['project_id']}/{file_record.data[0]['file_name']}"
+            supabase.storage.from_("project_files").remove([path])
+        
+        # 2. Delete the database record
+        supabase.table("project_files").delete().eq("id", file_id).execute()
+        return {"status": "File deleted"}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
