@@ -293,3 +293,83 @@ async function sendChat() {
         input.focus(); // Snap the cursor back for the next question
     }
 }
+
+// --- Custom Dropdown Engine ---
+function initializeNexusDropdowns() {
+    document.querySelectorAll('.nexus-select').forEach(nativeSelect => {
+        // Prevent double initialization
+        if (nativeSelect.nextElementSibling && nativeSelect.nextElementSibling.classList.contains('nexus-dropdown-wrapper')) {
+            return;
+        }
+
+        // 1. Build the UI wrapper
+        const wrapper = document.createElement('div');
+        wrapper.className = 'nexus-dropdown-wrapper';
+        nativeSelect.parentNode.insertBefore(wrapper, nativeSelect.nextSibling);
+        wrapper.appendChild(nativeSelect);
+
+        // 2. Build the visual button (trigger)
+        const trigger = document.createElement('div');
+        trigger.className = 'nexus-dropdown-trigger';
+        trigger.innerHTML = `
+            <span class="trigger-text">Loading...</span>
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 9l6 6 6-6"/></svg>
+        `;
+        wrapper.appendChild(trigger);
+
+        const optionsContainer = document.createElement('div');
+        optionsContainer.className = 'nexus-dropdown-options';
+        wrapper.appendChild(optionsContainer);
+
+        // 3. The function that populates the custom options
+        const renderOptions = () => {
+            optionsContainer.innerHTML = '';
+            Array.from(nativeSelect.options).forEach(option => {
+                const optDiv = document.createElement('div');
+                optDiv.className = `nexus-dropdown-option ${option.selected ? 'selected' : ''}`;
+                optDiv.dataset.value = option.value;
+                optDiv.innerText = option.text;
+
+                // When a custom option is clicked...
+                optDiv.addEventListener('click', () => {
+                    nativeSelect.value = option.value; // Update the hidden real select
+                    trigger.querySelector('.trigger-text').innerText = option.text; // Update text
+
+                    optionsContainer.querySelectorAll('.nexus-dropdown-option').forEach(el => el.classList.remove('selected'));
+                    optDiv.classList.add('selected');
+                    wrapper.classList.remove('open'); // Close dropdown
+
+                    // Fire the standard 'change' event so your existing logic (like clearChat) triggers
+                    nativeSelect.dispatchEvent(new Event('change'));
+                });
+                optionsContainer.appendChild(optDiv);
+            });
+            // Set initial text
+            trigger.querySelector('.trigger-text').innerText = nativeSelect.options[nativeSelect.selectedIndex]?.text || 'Select...';
+        };
+
+        // Render immediately
+        renderOptions();
+
+        // 4. Watch for dynamic API updates (Crucial for your project lists!)
+        const observer = new MutationObserver(renderOptions);
+        observer.observe(nativeSelect, { childList: true });
+
+        // 5. Open/Close Logic
+        trigger.addEventListener('click', (e) => {
+            e.stopPropagation();
+            document.querySelectorAll('.nexus-dropdown-wrapper').forEach(w => {
+                if (w !== wrapper) w.classList.remove('open');
+            });
+            wrapper.classList.toggle('open');
+        });
+    });
+
+    // Close all if clicking outside
+    document.addEventListener('click', () => {
+        document.querySelectorAll('.nexus-dropdown-wrapper').forEach(w => w.classList.remove('open'));
+    });
+}
+
+// Ensure this runs when the page loads
+document.addEventListener('DOMContentLoaded', initializeNexusDropdowns);

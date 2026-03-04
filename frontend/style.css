@@ -40,13 +40,24 @@ body {
 
 /* --- Login Box --- */
 .login-container {
-    margin: auto;
-    padding: 48px 40px;
-    background: var(--bg-surface);
-    border-radius: var(--radius-card);
+    display: flex;
     width: 100%;
-    max-width: 420px;
-    text-align: center;
+    justify-content: space-around;
+    align-items: center;
+}
+
+.logo-container {
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+}
+
+.logo {
+    width: 30%;
+}
+
+.sidebar-logo {
+    width: 50%;
 }
 
 .login-container h2 {
@@ -392,4 +403,95 @@ body {
     animation: ai-pulse 2.5s infinite ease-in-out !important;
     background-color: #FFFFFF !important;
     /* Slight pop from the surface background */
+}
+
+/* --- Custom Nexus Dropdowns (Gemini Aesthetic) --- */
+.nexus-select {
+    display: none;
+    /* Hide the ugly native OS dropdowns */
+}
+
+.nexus-dropdown-wrapper {
+    position: relative;
+    user-select: none;
+    min-width: 200px;
+}
+
+/* Make them expand properly inside your Admin Panel forms */
+.form-group .nexus-dropdown-wrapper {
+    flex: 1;
+}
+
+.nexus-dropdown-trigger {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 14px 24px;
+    background: var(--bg-surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-pill);
+    cursor: pointer;
+    font-size: 0.95rem;
+    font-weight: 500;
+    color: var(--text-primary);
+    transition: all 0.2s ease;
+    gap: 12px;
+}
+
+/* Chat Input model selector needs to blend in */
+.input-box .nexus-dropdown-trigger {
+    border: none;
+    background: transparent;
+    padding: 8px 12px;
+    color: var(--text-secondary);
+}
+
+.nexus-dropdown-trigger:hover {
+    background: #E1E5EA;
+    /* Soft hover effect */
+}
+
+.nexus-dropdown-options {
+    position: absolute;
+    top: calc(100% + 8px);
+    left: 0;
+    right: 0;
+    background: var(--bg-main);
+    border: 1px solid var(--border);
+    border-radius: 16px;
+    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.08);
+    overflow: hidden;
+    z-index: 100;
+    opacity: 0;
+    visibility: hidden;
+    transform: translateY(-10px);
+    transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+    max-height: 300px;
+    overflow-y: auto;
+}
+
+/* Open State Animation */
+.nexus-dropdown-wrapper.open .nexus-dropdown-options {
+    opacity: 1;
+    visibility: visible;
+    transform: translateY(0);
+}
+
+.nexus-dropdown-option {
+    padding: 14px 24px;
+    font-size: 0.95rem;
+    color: var(--text-secondary);
+    cursor: pointer;
+    transition: background 0.1s;
+}
+
+.nexus-dropdown-option:hover {
+    background: var(--bg-surface);
+    color: var(--text-primary);
+}
+
+.nexus-dropdown-option.selected {
+    color: var(--accent);
+    font-weight: 600;
+    background: rgba(10, 86, 208, 0.04);
 }

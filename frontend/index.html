@@ -14,22 +14,33 @@
 
     <div id="view-login" class="view active">
         <div class="login-container">
-            <h2>Sign In</h2>
-            <input type="text" id="email" placeholder="Email Address">
-            <input type="password" id="password" placeholder="Password">
-            <button onclick="login()">Continue</button>
-            <div id="login-error" style="color: #D93025; margin-top: 16px; font-size: 0.9rem;"></div>
+            <div class="logo-container">
+                <img class="logo" src="/frontend/images/nexus_logo.png" alt="Nexus logo">
+                <br><br>
+                <h2>Complex Data. Simplified Insights. Absolute Clarity.</h2>
+            </div>
+            <div class="login-form-container">
+                <h2>Sign In</h2>
+                <input type="text" id="email" placeholder="Email Address">
+                <input type="password" id="password" placeholder="Password">
+                <button onclick="login()">Continue</button>
+                <div id="login-error" style="color: #D93025; margin-top: 16px; font-size: 0.9rem;"></div>
+            </div>
+
         </div>
     </div>
 
     <div id="view-app" class="view">
 
         <aside class="sidebar">
-            <h2 style="padding: 12px 20px; margin-bottom: 12px; font-weight: 500;">Nexus</h2>
-            <nav id="nav-menu" style="display: flex; flex-direction: column; height: 100vh; justify-content: space-between;">
+            <img class="sidebar-logo" src="/frontend/images/nexus_logo.png" alt="Nexus logo">
+            <br>
+            <nav id="nav-menu"
+                style="display: flex; flex-direction: column; height: 100vh; justify-content: space-between;">
                 <div class="nav-item active" onclick="switchTab('chat')">
                     Analyze
                 </div>
+                <br>
                 <div class="nav-item admin-only" onclick="switchTab('admin')" style="display:none;">
                     Administration
                 </div>
@@ -41,7 +52,7 @@
 
         <main class="main-content">
             <div class="header">
-                <select id="project-selector" class="project-selector" onchange="clearChat()"></select>
+                <select id="project-selector" class="nexus-select" onchange="clearChat()"></select>
                 <div style="color: var(--text-secondary); font-weight: 500;" id="user-badge"></div>
             </div>
 
@@ -53,11 +64,11 @@
                 </div>
                 <div class="input-wrapper">
                     <div class="input-box">
-                        <select id="model-select"
-                            style="border:none; outline:none; background:transparent; margin-right: 16px; font-weight: 500; color: var(--text-secondary); cursor: pointer;">
+                        <select id="model-select" class="nexus-select">
                             <option value="openai">🌐 GPT-4o</option>
                             <option value="gemini">✨ Gemini</option>
                         </select>
+
                         <input type="text" id="user-input" placeholder="Ask a question about the project data..."
                             onkeypress="if(event.key === 'Enter') sendChat()">
                         <button class="send-btn" onclick="sendChat()">
@@ -88,7 +99,7 @@
                         <div class="form-group">
                             <input type="email" id="new-email" placeholder="Email Address">
                             <input type="password" id="new-password" placeholder="Password (Min 6 chars)">
-                            <select id="new-role" class="project-selector">
+                            <select id="new-role" class="nexus-select">
                                 <option value="user">Standard User</option>
                                 <option value="admin">Administrator</option>
                             </select>
@@ -100,7 +111,7 @@
                         <h2>3. Manage Access Controls</h2>
                         <div class="form-group">
                             <input type="email" id="assign-email" placeholder="User Email">
-                            <select id="assign-project-id" class="project-selector"></select>
+                            <select id="assign-project-id" class="nexus-select"></select>
                             <button class="btn-pill" onclick="assignUser()">Grant Access</button>
                         </div>
                     </div>
@@ -108,11 +119,12 @@
                     <div class="card">
                         <h2>4. Upload Knowledge Base</h2>
                         <div class="form-group">
-                            <select id="upload-project-id" class="project-selector"></select>
-                            <select id="upload-model" class="project-selector">
+                            <select id="upload-project-id" class="nexus-select"></select>
+                            <select id="upload-model" class="nexus-select">
                                 <option value="openai">🌐 OpenAI</option>
                                 <option value="gemini">✨ Gemini</option>
                             </select>
+
                             <input type="file" id="file-upload" multiple accept=".xlsx,.csv,.ppt,.pptx, .pdf"
                                 style="background: var(--bg-main);">
                             <button class="btn-pill" onclick="uploadData()" id="upload-btn">Sync to Vector DB</button>
@@ -122,7 +134,6 @@
                         </div>
                     </div>
                 </div>
-
 
             </div>
         </main>
