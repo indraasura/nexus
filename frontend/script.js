@@ -66,19 +66,19 @@ function logout() {
 
 // --- UI NAVIGATION ---
 function switchTab(tabId) {
-    document.getElementById('tab-chat').style.display = tabId === 'chat' ? 'flex' : 'none';
-    document.getElementById('tab-admin').style.display = tabId === 'admin' ? 'block' : 'none';
-
+    // 1. Hide all tab contents and remove active states from navigation
     document.querySelectorAll('.tab-content').forEach(t => t.style.display = 'none');
     document.querySelectorAll('.nav-item').forEach(el => el.classList.remove('active'));
 
-    document.getElementById(`tab-${tabId}`).style.display = 'block';
-    event.currentTarget.classList.add('active');
+    // 2. Show the requested tab with the correct layout mode
+    // CRITICAL: Chat MUST be 'flex' so your CSS height calculations work
+    document.getElementById(`tab-${tabId}`).style.display = tabId === 'chat' ? 'flex' : 'block';
     
     if (tabId === 'admin') {
         loadAdminData();
     }
 
+    // 3. Highlight the clicked menu item
     if (window.event && window.event.currentTarget) {
         window.event.currentTarget.classList.add('active');
     } else if (tabId === 'chat') {
@@ -240,7 +240,10 @@ function appendMessage(role, text) {
         new Chart(ctx, chart.config);
     });
 
-    container.scrollTop = container.scrollHeight;
+    // CRITICAL: Give the browser 100ms to paint the new HTML to the screen before scrolling
+    setTimeout(() => {
+        container.scrollTop = container.scrollHeight;
+    }, 100);
 }
 
 async function sendChat() {

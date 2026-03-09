@@ -130,11 +130,10 @@ body {
 }
 
 .tab-content {
-    flex: 1;
+    height: calc(100v - 80px);
     display: flex;
     flex-direction: column;
     overflow: hidden;
-    /* This is the magic bullet that forces scrolling */
 }
 
 .header {
@@ -161,8 +160,8 @@ body {
 /* --- Chat Interface --- */
 .chat-container {
     flex: 1;
-    padding: 20px 40px 140px 40px;
-    overflow-y: auto;
+    overflow-y: auto; /* Unlocks the vertical scrollbar */
+    padding: 20px 40px 180px 40px;
     display: flex;
     flex-direction: column;
     gap: 32px;
@@ -206,10 +205,10 @@ body {
 .input-wrapper {
     position: absolute;
     bottom: 0;
-    left: 0;
-    right: 0;
-    padding: 24px 40px;
-    background: linear-gradient(transparent, var(--bg-main) 30%);
+    width: 100%;
+    padding: 0 40px 32px 40px; 
+    background: var(--bg-main);
+    z-index: 20;
 }
 
 .input-box {

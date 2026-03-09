@@ -8,12 +8,14 @@ import io
 from pathlib import Path
 from supabase import create_client, Client
 import PyPDF2
+import boto3
 
 # --- LANGCHAIN IMPORTS ---
 from langchain_text_splitters import RecursiveCharacterTextSplitter
 from langchain_community.vectorstores import FAISS
 from langchain_google_genai import GoogleGenerativeAIEmbeddings, ChatGoogleGenerativeAI
-from langchain_openai import OpenAIEmbeddings, ChatOpenAI
+# from langchain_openai import OpenAIEmbeddings, ChatOpenAI
+from langchain_aws import ChatBedrockConverse, BedrockEmbeddings
 from langchain_core.prompts import ChatPromptTemplate
 from langchain_core.documents import Document
 from langchain_core.runnables import RunnablePassthrough
@@ -214,8 +216,8 @@ async def upload_files(files: list[UploadFile] = File(...), project_id: int = Fo
         file_path = f"project_{project_id}/{file.filename}"
         
         try:
+            # 1. --- UPLOAD TO SUPABASE STORAGE ---
             supabase.storage.from_("project_files").upload(file_path, contents, file_options={"upsert": "true"})
-            
             file_url = supabase.storage.from_("project_files").get_public_url(file_path)
             
             supabase.table("project_files").insert({
@@ -250,18 +252,24 @@ async def upload_files(files: list[UploadFile] = File(...), project_id: int = Fo
     text_splitter = RecursiveCharacterTextSplitter(chunk_size=10000, chunk_overlap=1000)
     chunks = text_splitter.split_documents(documents)
     
-    google_key = os.getenv("GOOGLE_API_KEY")
-    openai_key = os.getenv("OPENAI_API_KEY")
-    
+    # --- DYNAMIC EMBEDDING ROUTING ---
     if "gemini" in model.lower():
-        embeddings = GoogleGenerativeAIEmbeddings(model="gemini-embedding-001", google_api_key=google_key, transport="rest")
+        embeddings = GoogleGenerativeAIEmbeddings(
+            model="gemini-embedding-001", 
+            google_api_key=os.getenv("GOOGLE_API_KEY"), 
+            transport="rest"
+        )
     else:
-        embeddings = OpenAIEmbeddings(
-            model="text-embedding-3-small", 
-            dimensions=768, 
-            openai_api_key=openai_key,
-            max_retries=5,
-            chunk_size=100
+        bedrock_client = boto3.client(
+            service_name="bedrock-runtime",
+            region_name=os.getenv("AWS_DEFAULT_REGION", "us-east-1"),
+            aws_access_key_id=os.getenv("AWS_ACCESS_KEY_ID"),
+            aws_secret_access_key=os.getenv("AWS_SECRET_ACCESS_KEY")
+        )
+        # Using AWS Titan Embeddings
+        embeddings = BedrockEmbeddings(
+            client=bedrock_client,
+            model_id="amazon.titan-embed-text-v2:0"
         )
         
     try:
@@ -270,7 +278,7 @@ async def upload_files(files: list[UploadFile] = File(...), project_id: int = Fo
         
         raw_vectors = embeddings.embed_documents(texts)
         
-        truncated_vectors = [vec[:768] for vec in raw_vectors]
+        truncated_vectors = [vec[:1024] for vec in raw_vectors]
         
         records = []
         for text, meta, vec in zip(texts, metadatas, truncated_vectors):
@@ -287,68 +295,49 @@ async def upload_files(files: list[UploadFile] = File(...), project_id: int = Fo
         raise HTTPException(status_code=500, detail=f"Failed to upload to vector database: {str(e)}")
     
     return {"status": "success", "message": f"Files and AI Data permanently saved to Project {project_id}."}
-    documents = []
-    for file in files:
-        contents = await file.read()
-        ext = file.filename.split('.')[-1].lower()
-        if ext in ['xlsx', 'xls']:
-            raw_text = pd.read_excel(io.BytesIO(contents)).to_markdown()
-        elif ext == 'csv':
-            raw_text = pd.read_csv(io.BytesIO(contents)).to_markdown()
-        elif ext in ['pptx', 'ppt']:
-            prs = Presentation(io.BytesIO(contents))
-            raw_text = "\n".join([shape.text for slide in prs.slides for shape in slide.shapes if hasattr(shape, "text")])
-        elif ext == 'pdf':
-            pdf_reader = PyPDF2.PdfReader(io.BytesIO(contents))
-            raw_text = "\n".join([page.extract_text() for page in pdf_reader.pages if page.extract_text()])
-        else:
-            raw_text = contents.decode('utf-8', errors='ignore')
-            
-        if raw_text:
-            documents.append(Document(page_content=raw_text, metadata={"source": file.filename}))
-            
-    if not documents:
-        raise HTTPException(status_code=400, detail="No readable text found.")
-
-    text_splitter = RecursiveCharacterTextSplitter(chunk_size=10000, chunk_overlap=1000)
-    chunks = text_splitter.split_documents(documents)
-    
-    google_key = os.getenv("GOOGLE_API_KEY")
-    openai_key = os.getenv("OPENAI_API_KEY")
-    db_key = "gemini" if "gemini" in model.lower() else "openai"
-    
-    embeddings = GoogleGenerativeAIEmbeddings(model="gemini-embedding-001", google_api_key=google_key, transport="rest") if db_key == "gemini" else OpenAIEmbeddings(model="text-embedding-3-small", openai_api_key=openai_key)
-        
-    vector_store = FAISS.from_documents(chunks, embeddings)
-    save_path = str(STORAGE_DIR / f"project_{project_id}_{db_key}")
-    vector_store.save_local(save_path)
-    
-    return {"status": "success", "message": f"Data permanently saved to Project {project_id}."}
 
 def format_docs(docs): return "\n\n".join(doc.page_content for doc in docs)
 
 @app.post("/chat")
 async def chat(message: str = Form(...), project_id: int = Form(...), model: str = Form(...), user: dict = Depends(get_current_user)):
-    google_key = os.getenv("GOOGLE_API_KEY")
-    openai_key = os.getenv("OPENAI_API_KEY")
-    openrouter_key = os.getenv("OPENROUTER_API_KEY")
     
     # --- DYNAMIC MODEL ROUTING ---
     if "gemini" in model.lower():
-        embeddings = GoogleGenerativeAIEmbeddings(model="gemini-embedding-001", google_api_key=google_key, transport="rest")
-        llm = ChatGoogleGenerativeAI(model=model, google_api_key=google_key, temperature=0, transport="rest")
-    
+        embeddings = GoogleGenerativeAIEmbeddings(model="models/embedding-001", google_api_key=os.getenv("GOOGLE_API_KEY"), transport="rest")
+        llm = ChatGoogleGenerativeAI(model=model, google_api_key=os.getenv("GOOGLE_API_KEY"), temperature=0, transport="rest")
     else:
-        embeddings = OpenAIEmbeddings(model="text-embedding-3-small", dimensions=768, openai_api_key=openai_key)
-        llm = ChatOpenAI(model="gpt-4o", openai_api_key=openai_key, temperature=0)
-    
-    # --- RAG RETRIEVAL (BYPASSING LANGCHAIN) ---
-    try:
-        print(f"\n--- 🔍 SEARCHING DB FOR PROJECT ID: {project_id} (Model: {model}) ---")
+        # AWS Bedrock Setup
+        bedrock_client = boto3.client(
+            service_name="bedrock-runtime",
+            region_name=os.getenv("AWS_DEFAULT_REGION", "ap-south-1"),
+            aws_access_key_id=os.getenv("AWS_ACCESS_KEY_ID"),
+            aws_secret_access_key=os.getenv("AWS_SECRET_ACCESS_KEY")
+        )
         
+        # Vector Embeddings (Keeping Titan for mathematical search)
+        embeddings = BedrockEmbeddings(
+            client=bedrock_client,
+            model_id="amazon.titan-embed-text-v2:0"
+        )
+        
+        # Using your team's Custom OSS Model via the Converse API
+        reasoning_effort = "medium"  # Can be "low", "medium", or "high"
+        
+        llm = ChatBedrockConverse(
+            client=bedrock_client,
+            model_id="openai.gpt-oss-20b-1:0", 
+            temperature=0,
+            # additional_model_request_fields={
+            #    "reasoning_effort": reasoning_effort
+            # }
+        )
+    
+    # --- RAG RETRIEVAL ---
+    try:
         query_embedding = embeddings.embed_query(message)
         
-        query_embedding = query_embedding[:768]
+        # Truncate to match your DB size
+        query_embedding = query_embedding[:1024]
         
         rpc_response = supabase.rpc(
             "match_project_documents",
@@ -360,15 +349,11 @@ async def chat(message: str = Form(...), project_id: int = Form(...), model: str
         ).execute()
         
         chunks = rpc_response.data
-        print(f"Found {len(chunks)} matching chunks in the database.")
-        
         context_text = "\n\n".join([row["content"] for row in chunks])
-        
         if not context_text.strip():
-            print("WARNING: Database returned 0 chunks. The AI context is completely empty!")
+            context_text = "No relevant context found."
             
     except Exception as e:
-        print(f"Database search error: {str(e)}")
         raise HTTPException(status_code=500, detail=f"Failed to search database: {str(e)}")
     
     # --- AI GENERATION ---
@@ -394,7 +379,6 @@ async def chat(message: str = Form(...), project_id: int = Form(...), model: str
         answer = rag_chain.invoke({"context": context_text, "input": message})
         return {"answer": answer}
     except Exception as e:
-        print(f"Chat execution error: {str(e)}")
         raise HTTPException(status_code=500, detail=f"Failed to generate AI response: {str(e)}")
 
 # --- NEW ADMIN ENDPOINTS (EDIT & DELETE) ---
