@@ -1,17 +1,22 @@
+# Core API & Web Server
 fastapi
 uvicorn
 python-multipart
+python-dotenv
+
+# Database & Storage
+supabase
+boto3
+
+# AI Orchestration
 langchain
 langchain-core
 langchain-community
 langchain-google-genai
-langchain-openai
-faiss-cpu
-python-dotenv
+langchain-aws
+
+# Data Parsing & Vectorization
 pandas
-tabulate
-python-pptx
 openpyxl
-supabase
+python-pptx
 PyPDF2
-boto3
