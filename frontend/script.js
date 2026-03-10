@@ -238,23 +238,32 @@ function appendMessage(role, text, sources = []) {
     // 3. --- Material Design Source Pills ---
     let sourcesHtml = "";
     if (role === 'ai' && sources && sources.length > 0) {
-        sourcesHtml = `<div class="sources-container"><div class="source-label">Sources used</div>`;
-
+        sourcesHtml = `<div class="sources-container"><div class="source-label">Documents referenced</div>`;
+        
         sources.forEach(src => {
-            // Check if it's a file that might need downloading (XLS, PPT) vs opening (PDF)
-            const isDownloadable = src.name.match(/\.(ppt|pptx|xls|xlsx|csv)$/i);
-
-            // Note: window.open bypasses the 'save as index.html' bug by hitting the bucket URL directly
-            sourcesHtml += `
-                <div class="source-pill" 
-                     onclick="window.open('${src.url}', '_blank')" 
-                     title="View ${src.name}">
-                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                        <path d="M14.5 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7.5L14.5 2z"></path>
-                        <polyline points="14 2 14 8 20 8"></polyline>
-                    </svg>
-                    <span class="pill-text">${src.name}</span>
-                </div>`;
+            // Check if URL is valid
+            const url = (src.url && src.url !== "#") ? src.url : null;
+            
+            if (url) {
+                sourcesHtml += `
+                    <a href="${url}" 
+                       target="_blank" 
+                       rel="noopener noreferrer" 
+                       class="source-pill" 
+                       title="View ${src.name}">
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                            <path d="M14.5 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7.5L14.5 2z"></path>
+                            <polyline points="14 2 14 8 20 8"></polyline>
+                        </svg>
+                        <span class="pill-text">${src.name}</span>
+                    </a>`;
+            } else {
+                // If no URL found, show a disabled-looking pill
+                sourcesHtml += `
+                    <div class="source-pill disabled" style="opacity: 0.5; cursor: not-allowed;">
+                        <span class="pill-text">${src.name} (Link Missing)</span>
+                    </div>`;
+            }
         });
         sourcesHtml += `</div>`;
     }

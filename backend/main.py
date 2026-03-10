@@ -330,48 +330,42 @@ async def chat(message: str = Form(...), project_id: int = Form(...), model: str
     
     # --- RAG RETRIEVAL ---
     try:
-        query_embedding = embeddings.embed_query(message)
-        query_embedding = query_embedding[:1024] # Ensure Titan/Gemini compatibility
-        
-        rpc_response = supabase.rpc(
-            "match_project_documents",
-            {
-                "query_embedding": query_embedding,
-                "match_count": 50,
-                "filter": {"project_id": int(project_id)} 
-            }
-        ).execute()
+        query_embedding = embeddings.embed_query(message)[:1024]
+        rpc_response = supabase.rpc("match_project_documents", {
+            "query_embedding": query_embedding,
+            "match_count": 20, # Higher count for better context
+            "filter": {"project_id": int(project_id)} 
+        }).execute()
         
         chunks = rpc_response.data or []
         context_text = ""
-        potential_sources = {} # Maps 'Filename' -> 'Public URL'
+        potential_filenames = set()
 
+        # Build context without interrupting the loop with DB calls
         for row in chunks:
             meta = row.get("metadata", {})
-            name = meta.get("source", "Unknown Document")
-            url = meta.get("file_url", "#")
+            name = meta.get("source", "Unknown")
             content = row.get("content", "")
-            
-            # Formatting context so the LLM clearly sees which text belongs to which file
             context_text += f"\n---\nDOCUMENT: {name}\nCONTENT: {content}\n"
-            potential_sources[name] = url
-            
+            potential_filenames.add(name)
+
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Database retrieval failed: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Search error: {str(e)}")
     
     # --- AI GENERATION ---
     system_prompt = (
-        "You are an enterprise data assistant. Answer based strictly on the provided context."
-        "If the information is not in the context, say you don't know."
-        "\n\nCHART INSTRUCTIONS: For graphs, output a valid JSON object wrapped in ```chart ... ```."
-        "\n\nCITATION INSTRUCTIONS: At the end of your answer, you MUST list only the document names you actually used."
-        "Format: SOURCES: [File1.pdf, File2.xlsx]"
-        "\n\nContext: {context}"
+        "You are an enterprise data assistant. Answer based strictly on the context provided.\n\n"
+        "### OUTPUT RULES:\n"
+        "1. VISUALS: If the user asks for a graph, trend, or comparison, you MUST generate a valid JSON object "
+        "wrapped in a ```chart ... ``` block. Use 'bar', 'line', or 'pie'.\n"
+        "Structure: {{ \"type\": \"bar\", \"data\": {{ \"labels\": [\"Jan\", \"Feb\"], \"datasets\": [{{ \"label\": \"Revenue\", \"data\": [100, 200], \"backgroundColor\": \"#0A56D0\" }}] }}, \"options\": {{ \"responsive\": true }} }}\n\n"
+        "2. CITATIONS: At the very end of your response, after any text or charts, you MUST list the document names used.\n"
+        "Format: SOURCES: [File1.pdf, File2.xlsx]\n\n"
+        "Context: {context}"
     )
 
     prompt_template = ChatPromptTemplate.from_messages([
-        ("system", system_prompt),
-        ("human", "{input}"),
+        ("system", system_prompt), ("human", "{input}"),
     ])
     
     rag_chain = prompt_template | llm | StrOutputParser()
@@ -379,35 +373,38 @@ async def chat(message: str = Form(...), project_id: int = Form(...), model: str
     try:
         full_response = rag_chain.invoke({"context": context_text, "input": message})
         
-        # --- CITATION FILTERING LOGIC ---
-        import re
+        # --- CLEAN SOURCE EXTRACTION ---
         cited_sources = []
         clean_answer = full_response
         
         if "SOURCES:" in full_response:
-            # Separate the answer from the citation tag
             parts = full_response.split("SOURCES:")
             clean_answer = parts[0].strip()
+            import re
+            raw_names = re.findall(r"\[(.*?)\]", parts[1])
             
-            # Extract names inside the brackets
-            raw_sources_match = re.findall(r"\[(.*?)\]", parts[1])
-            if raw_sources_match:
-                # Split by comma and clean up whitespace
-                names_in_citation = [n.strip() for n in raw_sources_match[0].split(",")]
+            if raw_names:
+                names_list = [n.strip() for n in raw_names[0].split(",")]
                 
-                for name in names_in_citation:
-                    # Only add if the file actually exists in our retrieval set
-                    if name in potential_sources:
-                        cited_sources.append({
-                            "name": name, 
-                            "url": potential_sources[name]
-                        })
+                # BATCH LOOKUP: One single query for all cited URLs
+                file_data = supabase.table("project_files") \
+                    .select("file_name, file_url") \
+                    .in_("file_name", names_list) \
+                    .eq("project_id", project_id) \
+                    .execute()
+                
+                # Map names to URLs
+                url_map = {f["file_name"]: f["file_url"] for f in file_data.data}
+                
+                for name in names_list:
+                    cited_sources.append({
+                        "name": name, 
+                        "url": url_map.get(name, "#") # Fallback to # if not in project_files
+                    })
 
-        # Return the clean answer and the verified source objects
         return {"answer": clean_answer, "sources": cited_sources}
-        
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"LLM Reasoning failed: {str(e)}")
+        raise HTTPException(status_code=500, detail=str(e))
 
 # --- NEW ADMIN ENDPOINTS (EDIT & DELETE) ---
 
