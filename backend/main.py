@@ -252,7 +252,7 @@ async def upload_files(files: list[UploadFile] = File(...), project_id: int = Fo
     
     if "gemini" in model.lower():
         embeddings = GoogleGenerativeAIEmbeddings(
-            model="models/embedding-001", 
+            model="gemini-embedding-001", 
             google_api_key=os.getenv("GOOGLE_API_KEY"), 
             transport="rest"
         )
@@ -290,7 +290,7 @@ async def upload_files(files: list[UploadFile] = File(...), project_id: int = Fo
 async def chat(message: str = Form(...), project_id: int = Form(...), model: str = Form(...), user: dict = Depends(get_current_user)):
     
     if "gemini" in model.lower():
-        embeddings = GoogleGenerativeAIEmbeddings(model="models/embedding-001", google_api_key=os.getenv("GOOGLE_API_KEY"), transport="rest")
+        embeddings = GoogleGenerativeAIEmbeddings(model="gemini-embedding-001", google_api_key=os.getenv("GOOGLE_API_KEY"), transport="rest")
         llm = ChatGoogleGenerativeAI(model=model, google_api_key=os.getenv("GOOGLE_API_KEY"), temperature=0, transport="rest")
     else:
         bedrock_client = boto3.client(
