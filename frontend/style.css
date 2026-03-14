@@ -1,15 +1,44 @@
 @import url('https://fonts.googleapis.com/css2?family=Google+Sans:wght@400;500;600&display=swap');
 
-:root {
+/* --- Global Theme Variables --- */
+:root[data-theme="light"] {
     --bg-main: #FFFFFF;
     --bg-surface: #F0F4F9;
+    --bg-input: #FFFFFF;
+    --bg-hover: #E1E5EA;
     --text-primary: #1F1F1F;
     --text-secondary: #444746;
     --accent: #0A56D0;
     --accent-hover: #0842A0;
     --border: #E3E3E3;
+    --border-highlight: #C4C7C5;
     --radius-pill: 50px;
     --radius-card: 24px;
+    --login-btn: #0A56D0;
+    --login-btn-text: #FFFFFF;
+    --login-btn-hover: #0842A0;
+    --login-btn-hover-text: #FFFFFF;
+    --table-th-bg: #F8F9FA;
+}
+
+:root[data-theme="dark"] {
+    --bg-main: #121212;
+    --bg-surface: #1A1A1A;
+    --bg-input: #050505;
+    --bg-hover: #2A2A2A;
+    --text-primary: #FFFFFF;
+    --text-secondary: #888888;
+    --accent: #669DF6;
+    --accent-hover: #4285F4;
+    --border: #333333;
+    --border-highlight: #555555;
+    --radius-pill: 50px;
+    --radius-card: 24px;
+    --login-btn: #4A4A4A;
+    --login-btn-text: #FFFFFF;
+    --login-btn-hover: #3aeee3;
+    --login-btn-hover-text: #000000;
+    --table-th-bg: #222222;
 }
 
 * {
@@ -25,6 +54,38 @@ body {
     height: 100vh;
     display: flex;
     overflow: hidden;
+    transition: background-color 0.3s ease, color 0.3s ease;
+}
+
+/* --- Theme Toggle Buttons --- */
+.theme-toggle {
+    position: absolute;
+    top: 32px;
+    right: 40px;
+    background: var(--bg-surface);
+    border: 1px solid var(--border);
+    color: var(--text-primary);
+    border-radius: 50%;
+    width: 44px;
+    height: 44px;
+    cursor: pointer;
+    font-size: 1.2rem;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: all 0.2s ease;
+    z-index: 100;
+}
+
+.theme-toggle:hover {
+    background: var(--bg-hover);
+}
+
+.header-toggle {
+    position: relative;
+    top: 0;
+    right: 0;
+    margin-left: 16px;
 }
 
 /* --- Views --- */
@@ -39,58 +100,130 @@ body {
 }
 
 /* --- Login Box --- */
-.login-container {
-    display: flex;
-    width: 100%;
-    justify-content: space-around;
+#view-login {
+    background-color: var(--bg-main);
+    justify-content: center;
     align-items: center;
+    width: 100%;
+    height: 100vh;
 }
 
-.logo-container {
+.login-wrapper {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    width: 100%;
+    height: 100%;
+    padding: 20px;
+}
+
+.login-card {
+    background-color: var(--bg-surface);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    width: 100%;
+    max-width: 420px;
+    padding: 40px 32px;
     display: flex;
     flex-direction: column;
-    justify-content: space-between;
+    align-items: center;
+    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4);
 }
 
-.logo {
-    width: 30%;
+.login-header {
+    text-align: center;
+    margin-bottom: 32px;
 }
 
-.sidebar-logo {
-    width: 50%;
+.login-header .logo {
+    width: 56px;
+    height: auto;
+    margin-bottom: 12px;
 }
 
-.login-container h2 {
+.login-header h2 {
+    color: var(--text-primary);
+    font-size: 1.6rem;
+    font-weight: 500;
+    margin-bottom: 4px;
+    letter-spacing: 0.5px;
+}
+
+.login-header p {
+    color: var(--text-secondary);
+    font-size: 0.85rem;
+}
+
+.login-form {
+    width: 100%;
+}
+
+.login-form h3 {
+    color: var(--text-primary);
+    font-size: 1.4rem;
+    font-weight: 600;
+    text-align: center;
     margin-bottom: 24px;
-    font-weight: 500;
 }
 
-.login-container input {
+.input-group {
+    margin-bottom: 20px;
     width: 100%;
-    padding: 16px 20px;
-    margin-bottom: 16px;
-    border-radius: var(--radius-pill);
+}
+
+.input-group label {
+    display: block;
+    color: var(--text-secondary);
+    font-size: 0.85rem;
+    margin-bottom: 8px;
+}
+
+.input-group input {
+    width: 100%;
+    background-color: var(--bg-input);
     border: 1px solid var(--border);
+    color: var(--text-primary);
+    padding: 14px 16px;
+    border-radius: 6px;
+    font-size: 0.95rem;
     outline: none;
-    font-size: 1rem;
-    background: var(--bg-main);
+    transition: border-color 0.2s;
 }
 
-.login-container button {
+.input-group input::placeholder {
+    color: var(--text-secondary);
+    font-style: italic;
+    opacity: 0.7;
+}
+
+.input-group input:focus {
+    border-color: var(--accent);
+}
+
+.login-form button {
     width: 100%;
-    padding: 16px;
-    border-radius: var(--radius-pill);
+    background-color: var(--login-btn);
+    color: var(--login-btn-text);
     border: none;
-    background: var(--accent);
-    color: white;
-    font-weight: 500;
+    padding: 14px;
+    border-radius: 6px;
     font-size: 1rem;
+    font-weight: 500;
     cursor: pointer;
-    transition: background 0.2s;
+    margin-top: 12px;
+    transition: background-color 0.2s, color 0.2s;
 }
 
-.login-container button:hover {
-    background: var(--accent-hover);
+.login-form button:hover {
+    background-color: var(--login-btn-hover);
+    color: var(--login-btn-hover-text);
+}
+
+.login-footer {
+    margin-top: 40px;
+    color: var(--text-secondary);
+    font-size: 0.75rem;
+    font-style: italic;
 }
 
 /* --- Sidebar --- */
@@ -101,6 +234,11 @@ body {
     display: flex;
     flex-direction: column;
     gap: 16px;
+    border-right: 1px solid var(--border);
+}
+
+.sidebar-logo {
+    width: 20%;
 }
 
 .nav-item {
@@ -117,7 +255,7 @@ body {
 
 .nav-item:hover,
 .nav-item.active {
-    background-color: #E1E5EA;
+    background-color: var(--bg-hover);
     color: var(--text-primary);
 }
 
@@ -150,6 +288,7 @@ body {
     padding: 10px 24px;
     border: 1px solid var(--border);
     background: var(--bg-surface);
+    color: var(--text-primary);
     font-size: 0.95rem;
     font-weight: 500;
     outline: none;
@@ -213,6 +352,7 @@ body {
 
 .input-box {
     background-color: var(--bg-surface);
+    border: 1px solid var(--border);
     border-radius: var(--radius-pill);
     display: flex;
     align-items: center;
@@ -230,9 +370,13 @@ body {
     color: var(--text-primary);
 }
 
+.input-box input::placeholder {
+    color: var(--text-secondary);
+}
+
 .send-btn {
     background: var(--text-primary);
-    color: white;
+    color: var(--bg-main);
     border: none;
     border-radius: 50%;
     width: 44px;
@@ -241,11 +385,11 @@ body {
     align-items: center;
     justify-content: center;
     cursor: pointer;
-    transition: 0.2s;
+    transition: background 0.2s;
 }
 
 .send-btn:hover {
-    background: #000000;
+    background: var(--accent);
 }
 
 /* --- Admin Panel --- */
@@ -276,6 +420,7 @@ body {
     background: var(--bg-surface);
     padding: 32px;
     border-radius: var(--radius-card);
+    border: 1px solid var(--border);
 }
 
 .card h2 {
@@ -296,6 +441,8 @@ body {
     padding: 14px 24px;
     border-radius: var(--radius-pill);
     border: 1px solid var(--border);
+    background: var(--bg-input);
+    color: var(--text-primary);
     outline: none;
     flex: 1;
     min-width: 200px;
@@ -306,14 +453,15 @@ body {
     border-radius: var(--radius-pill);
     border: none;
     background: var(--text-primary);
-    color: white;
+    color: var(--bg-main);
     cursor: pointer;
     font-weight: 500;
     transition: 0.2s;
 }
 
 .btn-pill:hover {
-    background: #000000;
+    background: var(--accent);
+    color: #FFFFFF;
 }
 
 /* --- Markdown Tables & Charts in Chat --- */
@@ -351,7 +499,7 @@ body {
 }
 
 .bubble th {
-    background-color: #F8F9FA;
+    background-color: var(--table-th-bg);
     font-weight: 600;
     color: var(--text-secondary);
 }
@@ -370,6 +518,7 @@ body {
     padding: 24px;
     background-color: var(--bg-surface);
     border-radius: var(--radius-card);
+    border: 1px solid var(--border);
 }
 
 /* --- AI Breathing Animation --- */
@@ -381,13 +530,11 @@ body {
 
     33% {
         box-shadow: 0 0 15px 2px rgba(161, 63, 244, 0.3);
-        /* Soft Purple Glow */
         border: 1px solid rgba(161, 63, 244, 0.6);
     }
 
     66% {
         box-shadow: 0 0 15px 2px rgba(66, 133, 244, 0.3);
-        /* Soft Blue Glow */
         border: 1px solid rgba(66, 133, 244, 0.6);
     }
 
@@ -399,14 +546,12 @@ body {
 
 .ai-thinking {
     animation: ai-pulse 2.5s infinite ease-in-out !important;
-    background-color: #FFFFFF !important;
-    /* Slight pop from the surface background */
+    background-color: var(--bg-surface) !important;
 }
 
-/* --- Custom Nexus Dropdowns (Gemini Aesthetic) --- */
+/* --- Custom Nexus Dropdowns --- */
 .nexus-select {
     display: none;
-    /* Hide the ugly native OS dropdowns */
 }
 
 .nexus-dropdown-wrapper {
@@ -415,7 +560,6 @@ body {
     min-width: 200px;
 }
 
-/* Make them expand properly inside your Admin Panel forms */
 .form-group .nexus-dropdown-wrapper {
     flex: 1;
 }
@@ -436,7 +580,6 @@ body {
     gap: 12px;
 }
 
-/* Chat Input model selector needs to blend in */
 .input-box .nexus-dropdown-trigger {
     border: none;
     background: transparent;
@@ -445,8 +588,7 @@ body {
 }
 
 .nexus-dropdown-trigger:hover {
-    background: #E1E5EA;
-    /* Soft hover effect */
+    background: var(--bg-hover);
 }
 
 .nexus-dropdown-options {
@@ -454,10 +596,10 @@ body {
     top: calc(100% + 8px);
     left: 0;
     right: 0;
-    background: var(--bg-main);
+    background: var(--bg-surface);
     border: 1px solid var(--border);
     border-radius: 16px;
-    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.08);
+    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.3);
     overflow: hidden;
     z-index: 100;
     opacity: 0;
@@ -468,7 +610,6 @@ body {
     overflow-y: auto;
 }
 
-/* Open State Animation */
 .nexus-dropdown-wrapper.open .nexus-dropdown-options {
     opacity: 1;
     visibility: visible;
@@ -484,14 +625,14 @@ body {
 }
 
 .nexus-dropdown-option:hover {
-    background: var(--bg-surface);
+    background: var(--bg-hover);
     color: var(--text-primary);
 }
 
 .nexus-dropdown-option.selected {
     color: var(--accent);
     font-weight: 600;
-    background: rgba(10, 86, 208, 0.04);
+    background: rgba(10, 86, 208, 0.1);
 }
 
 /* --- Admin Secondary Navigation --- */
@@ -512,7 +653,6 @@ body {
     cursor: pointer;
     border-bottom: 3px solid transparent;
     margin-bottom: -2px;
-    /* Pull it down to overlap the container border */
     transition: all 0.2s ease;
 }
 
@@ -525,7 +665,7 @@ body {
     border-bottom: 3px solid var(--accent);
 }
 
-/* --- Data Tables (Nexus Style) --- */
+/* --- Data Tables --- */
 .nexus-table {
     width: 100%;
     border-collapse: collapse;
@@ -549,7 +689,7 @@ body {
 }
 
 .nexus-table tr:hover td {
-    background-color: rgba(0, 0, 0, 0.02);
+    background-color: var(--bg-hover);
 }
 
 .nexus-table tr:last-child td {
@@ -570,7 +710,7 @@ body {
 }
 
 .action-btn:hover {
-    background: rgba(10, 86, 208, 0.08);
+    background: rgba(10, 86, 208, 0.15);
 }
 
 .action-btn.danger {
@@ -578,7 +718,7 @@ body {
 }
 
 .action-btn.danger:hover {
-    background: rgba(217, 48, 37, 0.08);
+    background: rgba(217, 48, 37, 0.15);
 }
 
 /* --- Role Badges --- */
@@ -587,165 +727,16 @@ body {
     border-radius: 12px;
     font-size: 0.8rem;
     font-weight: 600;
-    background: #E1E5EA;
+    background: var(--bg-hover);
     color: var(--text-secondary);
 }
 
 .role-badge.admin {
-    background: rgba(10, 86, 208, 0.1);
+    background: rgba(10, 86, 208, 0.2);
     color: var(--accent);
 }
 
-/* --- MOBILE RESPONSIVENESS (Max Width: 768px) --- */
-@media (max-width: 768px) {
-
-    /* Login Screen Stacking */
-    .login-container {
-        flex-direction: column;
-        justify-content: center;
-        gap: 40px;
-        padding: 32px;
-        text-align: center;
-    }
-
-    .logo-container h2 {
-        font-size: 1.2rem;
-    }
-
-    .logo {
-        width: 60%;
-        margin: 0 auto;
-    }
-
-    .login-form-container {
-        width: 100%;
-        max-width: 400px;
-    }
-
-    /* Sidebar to Sliding Drawer */
-    .sidebar {
-        position: fixed;
-        left: -100%;
-        top: 0;
-        z-index: 1000;
-        transition: left 0.3s cubic-bezier(0.16, 1, 0.3, 1);
-        box-shadow: 4px 0 24px rgba(0, 0, 0, 0.15);
-    }
-
-    .sidebar.open {
-        left: 0;
-    }
-
-    #sidebar-overlay {
-        display: none;
-        position: fixed;
-        top: 0;
-        left: 0;
-        right: 0;
-        bottom: 0;
-        background: rgba(0, 0, 0, 0.4);
-        z-index: 999;
-        backdrop-filter: blur(2px);
-    }
-
-    #sidebar-overlay.active {
-        display: block;
-    }
-
-    /* Header & Mobile Menu Trigger */
-    .header {
-        padding: 16px;
-    }
-
-    #mobile-menu-btn {
-        display: flex !important;
-    }
-
-    /* Chat Interface */
-    .chat-container {
-        padding: 16px 16px 120px 16px;
-    }
-
-    .message {
-        max-width: 95%;
-    }
-
-    .input-wrapper {
-        padding: 16px;
-    }
-
-    /* Make model selector and input wrap cleanly */
-    .input-box {
-        flex-wrap: wrap;
-        border-radius: 16px;
-        padding: 12px;
-    }
-
-    .input-box .nexus-dropdown-wrapper {
-        width: 100%;
-        margin-bottom: 8px;
-        border-bottom: 1px solid var(--border);
-        padding-bottom: 8px;
-    }
-
-    /* Admin Panel Adaptations */
-    .admin-panel {
-        padding: 16px;
-    }
-
-    .admin-tabs {
-        overflow-x: auto;
-        white-space: nowrap;
-        /* Keeps tabs on one line */
-        padding-bottom: 8px;
-        gap: 20px;
-    }
-
-    .admin-tabs::-webkit-scrollbar {
-        display: none;
-    }
-
-    /* Clean scrolling */
-
-    .card-container {
-        flex-direction: column !important;
-    }
-
-    .form-group {
-        flex-direction: column;
-    }
-
-    .form-group input,
-    .form-group .nexus-dropdown-wrapper,
-    .btn-pill {
-        width: 100%;
-        min-width: 100%;
-    }
-
-    /* Horizontal Scroll for Data Tables */
-    .card {
-        padding: 20px;
-        overflow-x: auto;
-    }
-
-}
-
-/* --- Fix: Make Chat Input Dropdown Open Upwards --- */
-.input-box .nexus-dropdown-options {
-    top: auto;
-    bottom: calc(100% + 8px);
-    /* Anchor to the top of the button instead of the bottom */
-    transform: translateY(10px);
-    /* Adjust the animation starting point */
-    box-shadow: 0 -10px 30px rgba(0, 0, 0, 0.08);
-    /* Flip the shadow to point upwards */
-}
-
-.input-box .nexus-dropdown-wrapper.open .nexus-dropdown-options {
-    transform: translateY(0);
-}
-
-/* --- VOICE MODE UI --- */
+/* --- VOICE UI (Remains mostly intact due to forced dark overlay overlay) --- */
 .icon-btn {
     background: transparent;
     border: none;
@@ -761,7 +752,7 @@ body {
 }
 
 .icon-btn:hover {
-    background: var(--bg-surface);
+    background: var(--bg-hover);
     color: var(--accent);
 }
 
@@ -825,7 +816,6 @@ body {
     margin: 0 auto;
 }
 
-/* --- THE SPHERE & ANIMATIONS --- */
 .sphere-wrapper {
     position: relative;
     width: 200px;
@@ -845,20 +835,17 @@ body {
     transition: all 0.4s ease;
 }
 
-/* State 1: Listening (Slow, calm breathing) */
 .voice-sphere.listening {
     animation: breathe 3s infinite ease-in-out;
     background: linear-gradient(135deg, rgba(255, 255, 255, 0.8), rgba(255, 255, 255, 0.4));
 }
 
-/* State 2: Thinking (Spinning & Pulsing) */
 .voice-sphere.thinking {
     animation: think 1.5s infinite linear;
     background: linear-gradient(135deg, #4285F4, #A13FF4, #4285F4);
     background-size: 200% 200%;
 }
 
-/* State 3: Speaking (Rapid, fluctuating modulation) */
 .voice-sphere.speaking {
     animation: speak 0.4s infinite alternate ease-in-out;
     background: linear-gradient(135deg, #4285F4, #0A56D0);
@@ -925,17 +912,17 @@ body {
 
 @keyframes nexus-fade {
     0% {
-        color: #444746;
+        color: var(--text-secondary);
         opacity: 0.7;
     }
 
     50% {
-        color: #0A56D0;
+        color: var(--accent);
         opacity: 1;
     }
 
     100% {
-        color: #444746;
+        color: var(--text-secondary);
         opacity: 0.7;
     }
 }
@@ -943,7 +930,7 @@ body {
 .step-icon {
     width: 16px;
     height: 16px;
-    border: 2px solid #0A56D0;
+    border: 2px solid var(--accent);
     border-top: 2px solid transparent;
     border-radius: 50%;
     animation: spin 1s linear infinite;
@@ -965,7 +952,7 @@ body {
     gap: 8px;
     margin-top: 20px;
     padding-top: 16px;
-    border-top: 1px solid rgba(0, 0, 0, 0.08);
+    border-top: 1px solid var(--border);
 }
 
 .source-label {
@@ -978,8 +965,8 @@ body {
 
 .source-pill {
     text-decoration: none;
-    background: #F0F4F9;
-    color: #1F1F1F;
+    background: var(--bg-surface);
+    color: var(--text-primary);
     padding: 6px 12px;
     border-radius: 8px;
     font-size: 0.8rem;
@@ -988,15 +975,186 @@ body {
     gap: 8px;
     cursor: pointer;
     transition: all 0.2s ease;
-    border: 1px solid transparent;
+    border: 1px solid var(--border-highlight);
 }
 
 .source-pill:hover {
-    background: #E1E5EA;
-    border-color: #C4C7C5;
+    background: var(--bg-hover);
     color: var(--accent);
 }
 
 .source-pill svg {
     color: var(--accent);
+}
+
+/* --- MOBILE RESPONSIVENESS --- */
+@media (max-width: 768px) {
+    .sidebar {
+        position: fixed;
+        left: -100%;
+        top: 0;
+        z-index: 1000;
+        transition: left 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+        box-shadow: 4px 0 24px rgba(0, 0, 0, 0.5);
+    }
+
+    .sidebar.open {
+        left: 0;
+    }
+
+    #sidebar-overlay {
+        display: none;
+        position: fixed;
+        top: 0;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        background: rgba(0, 0, 0, 0.6);
+        z-index: 999;
+        backdrop-filter: blur(2px);
+    }
+
+    #sidebar-overlay.active {
+        display: block;
+    }
+
+    .header {
+        padding: 16px;
+    }
+
+    #mobile-menu-btn {
+        display: flex !important;
+    }
+
+    .chat-container {
+        padding: 16px 16px 120px 16px;
+    }
+
+    .message {
+        max-width: 95%;
+    }
+
+    .input-wrapper {
+        padding: 16px;
+    }
+
+    .input-box {
+        flex-wrap: wrap;
+        border-radius: 16px;
+        padding: 12px;
+    }
+
+    .input-box .nexus-dropdown-wrapper {
+        width: 100%;
+        margin-bottom: 8px;
+        border-bottom: 1px solid var(--border);
+        padding-bottom: 8px;
+    }
+
+    .admin-panel {
+        padding: 16px;
+    }
+
+    .admin-tabs {
+        overflow-x: auto;
+        white-space: nowrap;
+        padding-bottom: 8px;
+        gap: 20px;
+    }
+
+    .admin-tabs::-webkit-scrollbar {
+        display: none;
+    }
+
+    .card-container {
+        flex-direction: column !important;
+    }
+
+    .form-group {
+        flex-direction: column;
+    }
+
+    .form-group input,
+    .form-group .nexus-dropdown-wrapper,
+    .btn-pill {
+        width: 100%;
+        min-width: 100%;
+    }
+
+    .card {
+        padding: 20px;
+        overflow-x: auto;
+    }
+}
+
+.input-box .nexus-dropdown-options {
+    top: auto;
+    bottom: calc(100% + 8px);
+    transform: translateY(10px);
+    box-shadow: 0 -10px 30px rgba(0, 0, 0, 0.3);
+}
+
+.input-box .nexus-dropdown-wrapper.open .nexus-dropdown-options {
+    transform: translateY(0);
+}
+
+/* --- Welcome Screen & Carousel --- */
+.welcome-screen {
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+    height: 100%;
+    text-align: center;
+    gap: 24px;
+    animation: fadeIn 0.5s ease;
+}
+
+.welcome-screen h2 {
+    color: var(--text-primary);
+    font-weight: 500;
+}
+
+.recommendation-carousel {
+    display: flex;
+    gap: 16px;
+    overflow-x: auto;
+    padding: 16px;
+    width: 100%;
+    max-width: 800px;
+    scrollbar-width: none; /* Firefox */
+}
+
+.recommendation-carousel::-webkit-scrollbar {
+    display: none; /* Chrome/Safari */
+}
+
+.recommendation-card {
+    background: var(--bg-surface);
+    border: 1px solid var(--border);
+    padding: 20px 24px;
+    border-radius: 16px;
+    min-width: 260px;
+    max-width: 260px;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    color: var(--text-secondary);
+    font-size: 0.95rem;
+    line-height: 1.5;
+    text-align: left;
+    display: flex;
+    align-items: center;
+}
+
+.recommendation-card:hover {
+    border-color: var(--accent);
+    background: var(--bg-hover);
+    color: var(--text-primary);
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+}
+
+@keyframes fadeIn {
+    from { opacity: 0; transform: translateY(10px); }
+    to { opacity: 1; transform: translateY(0); }
 }

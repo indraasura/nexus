@@ -8,25 +8,96 @@
     <link rel="stylesheet" href="style.css">
     <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
+    <script>
+        function updateChartTheme(theme) {
+            // Check if Chart.js is loaded yet
+            if (typeof Chart === 'undefined') return;
+
+            const textColor = theme === 'dark' ? '#E0E0E0' : '#444746';
+            const gridColor = theme === 'dark' ? '#333333' : '#E3E3E3';
+
+            // 1. Set global defaults for any future charts generated
+            Chart.defaults.color = textColor;
+            Chart.defaults.scale.grid.color = gridColor;
+            Chart.defaults.scale.grid.borderColor = gridColor;
+
+            // 2. Loop through any currently visible charts and update them instantly
+            for (let id in Chart.instances) {
+                let chart = Chart.instances[id];
+
+                if (chart.options.scales) {
+                    for (let axis in chart.options.scales) {
+                        if (chart.options.scales[axis].ticks) chart.options.scales[axis].ticks.color = textColor;
+                        if (chart.options.scales[axis].grid) chart.options.scales[axis].grid.color = gridColor;
+                    }
+                }
+
+                if (chart.options.plugins && chart.options.plugins.legend) {
+                    chart.options.plugins.legend.labels.color = textColor;
+                }
+
+                chart.update(); // Trigger the smooth re-render animation
+            }
+        }
+
+        // Initialize Theme on Load
+        const savedTheme = localStorage.getItem('nexus_theme') || 'dark';
+        document.documentElement.setAttribute('data-theme', savedTheme);
+
+        // Ensure charts load with the correct theme right away
+        window.addEventListener('load', () => updateChartTheme(savedTheme));
+
+        // The Toggle Function
+        function toggleTheme() {
+            const html = document.documentElement;
+            const currentTheme = html.getAttribute('data-theme');
+            const newTheme = currentTheme === 'dark' ? 'light' : 'dark';
+
+            html.setAttribute('data-theme', newTheme);
+            localStorage.setItem('nexus_theme', newTheme);
+
+            // Sync the charts to the new theme
+            updateChartTheme(newTheme);
+        }
+    </script>
 </head>
 
 <body>
 
     <div id="view-login" class="view active">
-        <div class="login-container">
-            <div class="logo-container">
-                <img class="logo" src="./images/nexus_logo.png" alt="Nexus logo">
-                <br><br>
-                <h2>Complex Data. Simplified Insights. Absolute Clarity.</h2>
-            </div>
-            <div class="login-form-container">
-                <h2>Sign In</h2>
-                <input type="text" id="email" placeholder="Email Address">
-                <input type="password" id="password" placeholder="Password">
-                <button onclick="login()">Continue</button>
-                <div id="login-error" style="color: #D93025; margin-top: 16px; font-size: 0.9rem;"></div>
-            </div>
+        <button class="theme-toggle" onclick="toggleTheme()" title="Toggle Dark/Light Mode">🌓</button>
 
+        <div class="login-wrapper">
+            <div class="login-card">
+                <div class="login-header">
+                    <img class="logo" src="./images/nexus_logo.gif" alt="Nexus logo">
+                    <h2>Nexus</h2>
+                    <p>Enterprise AI Knowledge Base</p>
+                </div>
+
+                <div class="login-form">
+                    <h3>Login</h3>
+
+                    <div class="input-group">
+                        <label>User Name</label>
+                        <input type="text" id="email" placeholder="Enter User Name">
+                    </div>
+
+                    <div class="input-group">
+                        <label>Password</label>
+                        <input type="password" id="password" placeholder="Enter Password">
+                    </div>
+
+                    <button onclick="login()">Login</button>
+                    <div id="login-error"
+                        style="color: #D93025; margin-top: 16px; font-size: 0.9rem; text-align: center;"></div>
+                </div>
+
+                <div class="login-footer">
+                    Powered by Wipro Linecraft AI
+                </div>
+            </div>
         </div>
     </div>
 
@@ -64,7 +135,11 @@
                     </button>
                     <select id="project-selector" class="nexus-select" onchange="clearChat()"></select>
                 </div>
-                <div style="color: var(--text-secondary); font-weight: 500;" id="user-badge"></div>
+                <div style="display: flex; align-items: center;">
+                    <div style="color: var(--text-secondary); font-weight: 500;" id="user-badge"></div>
+                    <button class="theme-toggle header-toggle" onclick="toggleTheme()"
+                        title="Toggle Dark/Light Mode">🌓</button>
+                </div>
             </div>
 
             <div id="sidebar-overlay" onclick="toggleSidebar()"></div>
@@ -82,11 +157,16 @@
                             <option value="gemini-2.5-pro">✨ Gemini 2.5 Pro</option>
                             <option value="bedrock-claude">☁️ AWS Bedrock</option>
                         </select>
-                        
+
                         <button class="icon-btn" onclick="toggleVoiceMode()" title="Voice Mode">
-                            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2a3 3 0 0 0-3 3v7a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3Z"></path><path d="M19 10v2a7 7 0 0 1-14 0v-2"></path><line x1="12" y1="19" x2="12" y2="22"></line></svg>
+                            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                                stroke-width="2">
+                                <path d="M12 2a3 3 0 0 0-3 3v7a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3Z"></path>
+                                <path d="M19 10v2a7 7 0 0 1-14 0v-2"></path>
+                                <line x1="12" y1="19" x2="12" y2="22"></line>
+                            </svg>
                         </button>
-                        
+
                         <input type="text" id="user-input" placeholder="Ask a question about the project data..."
                             onkeypress="if(event.key === 'Enter') sendChat()">
                         <button class="send-btn" onclick="sendChat()">
@@ -238,11 +318,11 @@
 
     <div id="voice-overlay" class="voice-overlay" style="display: none;">
         <button class="close-voice-btn" onclick="toggleVoiceMode()">✕</button>
-        
+
         <div class="voice-container">
             <h3 id="voice-status">Listening...</h3>
             <p id="voice-transcript">Say something about your project.</p>
-            
+
             <div class="sphere-wrapper">
                 <div id="voice-sphere" class="voice-sphere listening"></div>
             </div>
