@@ -11,18 +11,15 @@
 
     <script>
         function updateChartTheme(theme) {
-            // Check if Chart.js is loaded yet
             if (typeof Chart === 'undefined') return;
 
             const textColor = theme === 'dark' ? '#E0E0E0' : '#444746';
             const gridColor = theme === 'dark' ? '#333333' : '#E3E3E3';
 
-            // 1. Set global defaults for any future charts generated
             Chart.defaults.color = textColor;
             Chart.defaults.scale.grid.color = gridColor;
             Chart.defaults.scale.grid.borderColor = gridColor;
 
-            // 2. Loop through any currently visible charts and update them instantly
             for (let id in Chart.instances) {
                 let chart = Chart.instances[id];
 
@@ -37,18 +34,14 @@
                     chart.options.plugins.legend.labels.color = textColor;
                 }
 
-                chart.update(); // Trigger the smooth re-render animation
+                chart.update();
             }
         }
 
-        // Initialize Theme on Load
         const savedTheme = localStorage.getItem('nexus_theme') || 'dark';
         document.documentElement.setAttribute('data-theme', savedTheme);
-
-        // Ensure charts load with the correct theme right away
         window.addEventListener('load', () => updateChartTheme(savedTheme));
 
-        // The Toggle Function
         function toggleTheme() {
             const html = document.documentElement;
             const currentTheme = html.getAttribute('data-theme');
@@ -56,14 +49,22 @@
 
             html.setAttribute('data-theme', newTheme);
             localStorage.setItem('nexus_theme', newTheme);
-
-            // Sync the charts to the new theme
             updateChartTheme(newTheme);
         }
     </script>
 </head>
 
 <body>
+
+    <div id="project-loader" class="project-loader-overlay">
+        <div class="project-loader-content">
+            <div class="voice-sphere thinking" style="width: 80px; height: 80px; margin: 0 auto;"></div>
+            <h2 style="color: var(--text-primary); font-weight: 500; margin-top: 24px;">Analyzing Knowledge Base...</h2>
+            <div class="thinking-steps" style="justify-content: center; margin-top: 12px;">
+                <div class="step-icon"></div> Generating recommended questions
+            </div>
+        </div>
+    </div>
 
     <div id="view-login" class="view active">
         <button class="theme-toggle" onclick="toggleTheme()" title="Toggle Dark/Light Mode">🌓</button>
@@ -153,8 +154,10 @@
                 <div class="input-wrapper">
                     <div class="input-box">
                         <select id="model-select" class="nexus-select">
+                            <!--
                             <option value="gemini-2.5-flash">⚡ Gemini 2.5 Flash</option>
                             <option value="gemini-2.5-pro">✨ Gemini 2.5 Pro</option>
+                            -->
                             <option value="bedrock-claude">☁️ AWS Bedrock</option>
                         </select>
 
@@ -276,8 +279,10 @@
                         <div class="form-group">
                             <select id="upload-project-id" class="nexus-select"></select>
                             <select id="upload-model" class="nexus-select">
+                                <!--
                                 <option value="gemini-2.5-flash">⚡ Gemini 2.5 Flash</option>
                                 <option value="gemini-2.5-pro">✨ Gemini 2.5 Pro</option>
+                                -->
                                 <option value="bedrock-claude">☁️ AWS Bedrock</option>
                             </select>
                             <input type="file" id="file-upload" multiple accept=".xlsx,.csv,.ppt,.pptx, .pdf"
@@ -321,7 +326,7 @@
 
         <div class="voice-container">
             <h3 id="voice-status">Listening...</h3>
-            <p id="voice-transcript">Say something about your project.</p>
+            <p id="voice-transcript">Ask something about your project.</p>
 
             <div class="sphere-wrapper">
                 <div id="voice-sphere" class="voice-sphere listening"></div>

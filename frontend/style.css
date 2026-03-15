@@ -99,6 +99,36 @@ body {
     display: flex;
 }
 
+/* --- FULL SCREEN PROJECT LOADER --- */
+.project-loader-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100vw;
+    height: 100vh;
+    background: var(--bg-main);
+    z-index: 99999;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    opacity: 0;
+    visibility: hidden;
+    transition: opacity 0.3s ease, visibility 0.3s ease;
+}
+
+.project-loader-overlay.active {
+    opacity: 1;
+    visibility: visible;
+}
+
+.project-loader-content {
+    text-align: center;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+}
+
 /* --- Login Box --- */
 #view-login {
     background-color: var(--bg-main);
@@ -736,7 +766,7 @@ body {
     color: var(--accent);
 }
 
-/* --- VOICE UI (Remains mostly intact due to forced dark overlay overlay) --- */
+/* --- VOICE UI --- */
 .icon-btn {
     background: transparent;
     border: none;
@@ -988,7 +1018,7 @@ body {
 }
 
 /* --- MOBILE RESPONSIVENESS --- */
-@media (max-width: 768px) {
+@media (max-width: 3000px) {
     .sidebar {
         position: fixed;
         left: -100%;
@@ -1025,7 +1055,9 @@ body {
     #mobile-menu-btn {
         display: flex !important;
     }
+}
 
+@media (max-width: 768px) {
     .chat-container {
         padding: 16px 16px 120px 16px;
     }
@@ -1122,11 +1154,11 @@ body {
     padding: 16px;
     width: 100%;
     max-width: 800px;
-    scrollbar-width: none; /* Firefox */
+    scrollbar-width: none;
 }
 
 .recommendation-carousel::-webkit-scrollbar {
-    display: none; /* Chrome/Safari */
+    display: none;
 }
 
 .recommendation-card {
@@ -1134,16 +1166,15 @@ body {
     border: 1px solid var(--border);
     padding: 20px 24px;
     border-radius: 16px;
-    min-width: 260px;
-    max-width: 260px;
+    min-width: 280px;
+    max-width: 280px;
+    min-height: 150px;
     cursor: pointer;
     transition: all 0.2s ease;
-    color: var(--text-secondary);
-    font-size: 0.95rem;
-    line-height: 1.5;
-    text-align: left;
     display: flex;
-    align-items: center;
+    flex-direction: column;
+    justify-content: space-between;
+    gap: 16px;
 }
 
 .recommendation-card:hover {
@@ -1151,10 +1182,32 @@ body {
     background: var(--bg-hover);
     color: var(--text-primary);
     transform: translateY(-2px);
-    box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+}
+
+.rc-question {
+    color: var(--text-secondary);
+    font-size: 0.95rem;
+    line-height: 1.5;
+    text-align: left;
+}
+
+.rc-pill {
+    align-self: flex-start;
+}
+
+.recommendation-card:hover .rc-question {
+    color: var(--text-primary);
 }
 
 @keyframes fadeIn {
-    from { opacity: 0; transform: translateY(10px); }
-    to { opacity: 1; transform: translateY(0); }
+    from {
+        opacity: 0;
+        transform: translateY(10px);
+    }
+
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
 }

@@ -4,13 +4,12 @@ const API_URL = "http://127.0.0.1:8000";
 let authToken = null;
 let currentRole = null;
 
-// Helper function to inject the JWT token into API calls
 async function apiCall(endpoint, options = {}) {
     if (authToken) {
         options.headers = { ...options.headers, 'Authorization': `Bearer ${authToken}` };
     }
     const response = await fetch(`${API_URL}${endpoint}`, options);
-    if (response.status === 401) logout(); // Auto-logout if token expires
+    if (response.status === 401) logout();
     return response;
 }
 
@@ -37,7 +36,6 @@ async function login() {
             document.getElementById('view-login').classList.remove('active');
             document.getElementById('view-app').classList.add('active');
 
-            // Show Admin Panel option if applicable
             if (currentRole === 'admin') {
                 document.querySelector('.admin-only').style.display = 'flex';
             } else {
@@ -199,12 +197,6 @@ async function uploadData() {
 }
 
 // --- CHAT & AI RENDERING ---
-function clearChat() {
-    const select = document.getElementById('project-selector');
-    const projectName = select.options[select.selectedIndex]?.text || "a project";
-    document.getElementById('chat-container').innerHTML = `<div class="message ai"><div class="bubble">Context switched to <b>${projectName}</b>. How can I help you analyze this data?</div></div>`;
-}
-
 function appendMessage(role, text, sources = []) {
     const container = document.getElementById('chat-container');
     const msgDiv = document.createElement('div');
@@ -241,7 +233,6 @@ function appendMessage(role, text, sources = []) {
         sourcesHtml = `<div class="sources-container"><div class="source-label">Documents referenced</div>`;
 
         sources.forEach(src => {
-            // Check if URL is valid
             const url = (src.url && src.url !== "#") ? src.url : null;
 
             if (url) {
@@ -258,7 +249,6 @@ function appendMessage(role, text, sources = []) {
                         <span class="pill-text">${src.name}</span>
                     </a>`;
             } else {
-                // If no URL found, show a disabled-looking pill
                 sourcesHtml += `
                     <div class="source-pill disabled" style="opacity: 0.5; cursor: not-allowed;">
                         <span class="pill-text">${src.name} (Link Missing)</span>
@@ -283,6 +273,7 @@ function appendMessage(role, text, sources = []) {
         msgDiv.scrollIntoView({ behavior: 'smooth', block: 'end' });
     }, 100);
 }
+
 async function sendChat() {
     const input = document.getElementById('user-input');
     const text = input.value.trim();
@@ -291,16 +282,21 @@ async function sendChat() {
 
     if (!text) return;
 
-    // 1. Project Validation
     const projectId = document.getElementById('project-selector').value;
     if (!projectId) return alert("Please select a project.");
 
-    // 2. UI Setup & User Message
+    // Instantly clear the welcome screen & recommendations if they exist
+    if (container.querySelector('.welcome-screen')) {
+        container.innerHTML = '';
+    }
+
     input.value = '';
     sendBtn.disabled = true;
-    appendMessage('user', text);
+    
+    // Append the user's message
+    container.innerHTML += `<div class="message user"><div class="bubble">${text}</div></div>`;
 
-    // 3. CREATE DYNAMIC LOADER (The "Thinking" state)
+    // Create and show the dynamic loader
     const loaderDiv = document.createElement('div');
     loaderDiv.className = 'message ai loading-status';
     loaderDiv.innerHTML = `
@@ -312,6 +308,7 @@ async function sendChat() {
         </div>
     `;
     container.appendChild(loaderDiv);
+    container.scrollTop = container.scrollHeight; 
 
     // Cycle through professional status updates
     const statuses = [
@@ -327,7 +324,6 @@ async function sendChat() {
         if (statusEl) statusEl.innerText = statuses[statusIndex];
     }, 2000);
 
-    // 4. API CALL
     const fd = new FormData();
     fd.append("message", text);
     fd.append("project_id", projectId);
@@ -337,12 +333,10 @@ async function sendChat() {
         const res = await apiCall('/chat', { method: 'POST', body: fd });
         const data = await res.json();
 
-        // Stop loader and remove it
         clearInterval(statusInterval);
         if (container.contains(loaderDiv)) container.removeChild(loaderDiv);
 
         if (res.ok) {
-            // PASS BOTH THE ANSWER AND THE SOURCES ARRAY
             appendMessage('ai', data.answer, data.sources);
         } else {
             appendMessage('ai', `⚠️ Error: ${data.detail}`);
@@ -354,8 +348,10 @@ async function sendChat() {
     } finally {
         sendBtn.disabled = false;
         input.focus();
+        container.scrollTop = container.scrollHeight;
     }
 }
+
 // --- Custom Dropdown Engine ---
 function initializeNexusDropdowns() {
     document.querySelectorAll('.nexus-select').forEach(nativeSelect => {
@@ -522,8 +518,8 @@ async function loadAdminDocuments() {
 async function deleteProject(id) {
     if (!confirm("Are you sure? This will delete the project and cascade-delete all associated files and access mappings.")) return;
     await apiCall(`/admin/projects/${id}`, { method: 'DELETE' });
-    loadAdminData(); // Refresh table
-    fetchProjects(); // Refresh dropdowns
+    loadAdminData();
+    fetchProjects();
 }
 
 async function editProject(id, currentName) {
@@ -582,7 +578,6 @@ let isVoiceModeActive = false;
 let recognition = null;
 let synth = window.speechSynthesis;
 
-// Initialize Speech Recognition
 if ('webkitSpeechRecognition' in window) {
     recognition = new webkitSpeechRecognition();
     recognition.continuous = false;
@@ -616,7 +611,6 @@ function setVoiceState(state, text) {
     const statusText = document.getElementById('voice-status');
     const transcriptText = document.getElementById('voice-transcript');
 
-    // Reset classes
     sphere.className = 'voice-sphere';
     sphere.classList.add(state);
 
@@ -679,7 +673,6 @@ async function processVoiceQuery(question) {
     fd.append("model", document.getElementById('model-select').value || "gemini-2.5-flash");
 
     try {
-        // We now use your custom apiCall helper so it automatically attaches the right URL and Auth Token
         const res = await apiCall('/chat', {
             method: 'POST',
             body: fd
@@ -691,11 +684,9 @@ async function processVoiceQuery(question) {
 
         const data = await res.json();
 
-        // Render the UI messages (including the source pills!)
         appendMessage('user', question);
         appendMessage('ai', data.answer, data.sources);
 
-        // Speak the clean text out loud
         speakResponse(data.answer);
 
     } catch (error) {
@@ -704,11 +695,7 @@ async function processVoiceQuery(question) {
     }
 }
 
-// We attach the utterance to the window object to prevent Chrome from deleting it mid-speech
 window.currentUtterance = null;
-
-// Define these at the top level of your script.js (outside the function)
-window.currentUtterance = null; 
 let typingInterval = null;
 
 function speakResponse(markdownText) {
@@ -716,17 +703,14 @@ function speakResponse(markdownText) {
 
     const safeText = markdownText ? markdownText.toString() : "";
 
-    // Clean formatting and citations
     const formatRegex = /[*#_`~]/g;
     const citeRegex = /SOURCES:\s*\[.*?\]/g;
     const cleanText = safeText.replace(formatRegex, '').replace(citeRegex, '').trim();
 
-    // Force the state update and explicitly clear the transcript text
-    setVoiceState('speaking', " "); 
+    setVoiceState('speaking', " ");
     const transcriptEl = document.getElementById('voice-transcript');
-    transcriptEl.innerText = ""; 
-    
-    // Clear any previous typing animations
+    transcriptEl.innerText = "";
+
     if (typingInterval) clearInterval(typingInterval);
 
     const utterance = new SpeechSynthesisUtterance(cleanText);
@@ -763,11 +747,12 @@ function speakResponse(markdownText) {
     synth.speak(utterance);
 }
 
-// This runs whenever the user selects a project from the top dropdown
+// --- DYNAMIC RECOMMENDATIONS (FULL SCREEN FIX) ---
 async function clearChat() {
     const projectId = document.getElementById('project-selector').value;
     const chatContainer = document.getElementById('chat-container');
-    
+    const loaderOverlay = document.getElementById('project-loader');
+
     if (!projectId) {
         chatContainer.innerHTML = `
             <div class="welcome-screen">
@@ -777,28 +762,31 @@ async function clearChat() {
         return;
     }
 
-    // 1. Show the loading state
-    chatContainer.innerHTML = `
-        <div class="welcome-screen">
-            <img src="./images/nexus_logo.gif" alt="Nexus" style="width: 72px; border-radius: 50%;">
-            <h2>Analyzing project context...</h2>
-            <div class="thinking-steps">
-                <div class="step-icon"></div> Generating recommended questions
-            </div>
-        </div>`;
+    // Immediately trigger the full-screen overlay
+    loaderOverlay.classList.add('active');
 
-    // 2. Fetch the recommendations from the backend
+    // Clear the chat container behind the scenes
+    chatContainer.innerHTML = '';
+
+    // Fetch the recommendations from the backend
     try {
         const res = await apiCall(`/projects/${projectId}/recommendations`, { method: 'GET' });
         const data = await res.json();
-        
+
         let cardsHtml = '';
-        data.questions.forEach(q => {
-            // Passing 'this.innerText' automatically grabs the question text when clicked
-            cardsHtml += `<div class="recommendation-card" onclick="askRecommendedQuestion(this.innerText)">${q}</div>`;
-        });
-        
-        // 3. Render the dynamic carousel
+        if (data.questions && data.questions.length > 0) {
+            data.questions.forEach(q => {
+                // Escape quotes to prevent breaking the onclick handler
+                const safeQuestion = q.replace(/'/g, "\\'");
+                
+                cardsHtml += `
+                    <div class="recommendation-card" onclick="askRecommendedQuestion('${safeQuestion}')">
+                        <div class="rc-question">${q}</div>
+                    </div>`;
+            });
+        }
+
+        // Render the dynamic carousel
         chatContainer.innerHTML = `
             <div class="welcome-screen">
                 <img src="./images/nexus_logo.gif" alt="Nexus" style="width: 72px; border-radius: 50%;">
@@ -807,25 +795,24 @@ async function clearChat() {
                     ${cardsHtml}
                 </div>
             </div>`;
-            
+
     } catch (error) {
         console.error("Failed to load recommendations:", error);
-        // Fallback UI if the API fails
         chatContainer.innerHTML = `
             <div class="welcome-screen">
                 <img src="./images/nexus_logo.gif" alt="Nexus" style="width: 72px; border-radius: 50%;">
                 <h2>How can I help you today?</h2>
                 <p style="color: var(--text-secondary);">Ask me anything about the uploaded documents.</p>
             </div>`;
+    } finally {
+        // Smoothly fade out the full-screen loader
+        loaderOverlay.classList.remove('active');
     }
 }
 
-// Triggers exactly as if the user typed the question and clicked Send
 function askRecommendedQuestion(questionText) {
     const input = document.getElementById('user-input');
     input.value = questionText;
-    
-    // Clear the welcome screen and execute the chat
     document.getElementById('chat-container').innerHTML = '';
     sendChat();
 }

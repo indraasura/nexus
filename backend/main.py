@@ -10,6 +10,7 @@ import PyPDF2
 import boto3
 import re
 import json
+import random
 
 # --- LANGCHAIN IMPORTS ---
 from langchain_text_splitters import RecursiveCharacterTextSplitter
@@ -304,7 +305,10 @@ async def chat(message: str = Form(...), project_id: int = Form(...), model: str
         llm = ChatBedrockConverse(client=bedrock_client, model_id="openai.gpt-oss-20b-1:0", temperature=0)
     
     try:
+        # Embed the raw message directly
         query_embedding = embeddings.embed_query(message)[:1024]
+        
+        # Only filter by project_id, let Titan embeddings do the semantic matching
         rpc_response = supabase.rpc("match_project_documents", {
             "query_embedding": query_embedding,
             "match_count": 20,
@@ -375,50 +379,55 @@ async def chat(message: str = Form(...), project_id: int = Form(...), model: str
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
+
 @app.get("/projects/{project_id}/recommendations")
 async def get_recommendations(project_id: int, user: dict = Depends(get_current_user)):
     try:
-        # 1. Fetch a small sample of documents for this specific project
-        # We cast project_id to string because it's inside a JSONB metadata object
-        docs = supabase.table("project_documents").select("content").eq("metadata->>project_id", str(project_id)).limit(3).execute()
+        # Fetch chunks to build context
+        docs = supabase.table("project_documents").select("content, metadata").contains("metadata", {"project_id": project_id}).limit(40).execute()
         
-        # Fallback if the project has no documents uploaded yet
         if not docs.data:
-            return {"questions": [
-                "What is the main objective of this project?", 
-                "Can you summarize the data?", 
-                "What are the key takeaways?"
-            ]}
+            return {"questions": []}
+            
+        sample_size = min(5, len(docs.data))
+        random_chunks = random.sample(docs.data, sample_size)
         
-        context = "\n\n".join([d["content"] for d in docs.data])
+        context = ""
+        for d in random_chunks:
+            src = d.get("metadata", {}).get("source", "Unknown")
+            context += f"--- Source Document: {src} ---\n{d['content']}\n\n"
         
-        # 2. Ask Gemini to generate 3 contextual questions
+        # Request a simple array of strings back
         prompt = (
-            "You are an analytical AI. Based on the following document excerpts from a corporate knowledge base, "
-            "generate exactly 3 insightful questions a user could ask to understand the data. "
-            "Return ONLY a valid JSON array of strings. Do not include markdown formatting like ```json.\n\n"
-            f"Context:\n{context[:3000]}"
+            "You are an analytical AI. Read the text chunks below.\n"
+            "Extract 3 to 5 highly specific facts.\n"
+            "Turn each fact into a specific question that can be answered purely by the text.\n"
+            "Return ONLY a valid JSON array of strings. Do not use markdown tags.\n"
+            "Example: [\"What is the Q3 revenue?\", \"How many Anvils and Rams are present in the Clutch Press shop?\"]\n\n"
+            f"Context:\n{context[:4000]}"
         )
         
-        llm = ChatGoogleGenerativeAI(
-            model="gemini-2.5-flash", 
-            google_api_key=os.getenv("GOOGLE_API_KEY"), 
-            temperature=0.7
+        bedrock_client = boto3.client(
+            service_name="bedrock-runtime",
+            region_name=os.getenv("AWS_DEFAULT_REGION", "ap-south-1"),
+            aws_access_key_id=os.getenv("AWS_ACCESS_KEY_ID"),
+            aws_secret_access_key=os.getenv("AWS_SECRET_ACCESS_KEY")
         )
+        llm = ChatBedrockConverse(client=bedrock_client, model_id="openai.gpt-oss-20b-1:0", temperature=0.7)
         
         response = llm.invoke(prompt)
         
-        # 3. Clean and parse the JSON response
-        clean_text = response.content.replace("```json", "").replace("```", "").strip()
-        questions = json.loads(clean_text)
+        raw_content = response.content
+        text_content = "".join(b.get("text", "") for b in raw_content if isinstance(b, dict)) if isinstance(raw_content, list) else str(raw_content)
         
-        return {"questions": questions[:3]}
+        clean_text = text_content.replace("```json", "").replace("```", "").strip()
+        questions_array = json.loads(clean_text)
+        
+        # Ensure we only send back strings
+        valid_questions = [str(q) for q in questions_array if isinstance(q, str)]
+        
+        return {"questions": valid_questions}
         
     except Exception as e:
         print(f"⚠️ Recommendation generation failed: {str(e)}")
-        # Bulletproof fallback in case the LLM formatting hiccups
-        return {"questions": [
-            "Can you provide an executive summary of this project?", 
-            "What are the key metrics and data points?", 
-            "What insights can you draw from the uploaded documents?"
-        ]}
+        return {"questions": []}
