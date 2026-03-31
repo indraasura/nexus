@@ -1,5 +1,5 @@
-// Change this to your Render URL when deploying https://nexus-backend-service.onrender.com
-const API_URL = "http://127.0.0.1:8000";
+// Change this to your Render URL when deploying nexus-backend-two.vercel.app
+const API_URL = "nexus-backend-two.vercel.app";
 
 let authToken = null;
 let currentRole = null;
