@@ -348,78 +348,39 @@ async def chat(message: str = Form(...), project_id: int = Form(...), model: str
         cited_sources = []
         clean_answer = full_response
         
-        if "SOURCES:" in full_response:
-            parts = full_response.rsplit("SOURCES:", 1)
-            clean_answer = parts[0].strip()
+        # --- 🚨 FULL-PROOF SOURCE EXTRACTION ENGINE 🚨 ---
+        # Hunts for variations like "SOURCES:", "Sources:", "**SOURCES:**", etc.
+        source_match = re.search(r'\*?\*[Ss]ources?:?\*?\*?\s*(.*)', full_response, re.IGNORECASE | re.DOTALL)
+        
+        if source_match:
+            # Cleanly severe the sources section from the visible chat answer
+            clean_answer = full_response[:source_match.start()].strip()
             
-            raw_names = re.findall(r"\[(.*?)\]", parts[1])
+            raw_sources_str = source_match.group(1).strip()
+            # Strip out any brackets or parentheses the AI might mistakenly add
+            clean_sources_str = re.sub(r'[\[\]\(\)]', '', raw_sources_str)
             
-            if raw_names:
-                names_list = [n.strip() for n in raw_names[0].split(",")]
+            if clean_sources_str:
+                # Split by comma and strip errant whitespace/quotes
+                names_list = [n.strip().strip('"\'') for n in clean_sources_str.split(",") if n.strip()]
                 
-                file_data = supabase.table("project_files") \
-                    .select("file_name, file_url") \
-                    .in_("file_name", names_list) \
-                    .eq("project_id", project_id) \
-                    .execute()
-                
-                url_map = {f["file_name"]: f["file_url"] for f in file_data.data}
-                
-                for name in names_list:
-                    cited_sources.append({
-                        "name": name, 
-                        "url": url_map.get(name, "#")
-                    })
+                if names_list:
+                    # Fetch real URL mappings from Supabase
+                    file_data = supabase.table("project_files") \
+                        .select("file_name, file_url") \
+                        .in_("file_name", names_list) \
+                        .eq("project_id", project_id) \
+                        .execute()
+                    
+                    url_map = {f["file_name"]: f["file_url"] for f in file_data.data}
+                    
+                    for name in names_list:
+                        cited_sources.append({
+                            "name": name, 
+                            "url": url_map.get(name, "#")
+                        })
+        # --------------------------------------------------
 
         return {"answer": clean_answer, "sources": cited_sources}
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
-'''
-@app.get("/projects/{project_id}/recommendations")
-async def get_recommendations(project_id: int, user: dict = Depends(get_current_user)):
-    try:
-        # 1. Fetch a small sample of documents for this specific project
-        # We cast project_id to string because it's inside a JSONB metadata object
-        docs = supabase.table("project_documents").select("content").eq("metadata->>project_id", str(project_id)).limit(3).execute()
-        
-        # Fallback if the project has no documents uploaded yet
-        if not docs.data:
-            return {"questions": [
-                "What is the main objective of this project?", 
-                "Can you summarize the data?", 
-                "What are the key takeaways?"
-            ]}
-        
-        context = "\n\n".join([d["content"] for d in docs.data])
-        
-        # 2. Ask Gemini to generate 3 contextual questions
-        prompt = (
-            "You are an analytical AI. Based on the following document excerpts from a corporate knowledge base, "
-            "generate exactly 3 insightful questions a user could ask to understand the data. "
-            "Return ONLY a valid JSON array of strings. Do not include markdown formatting like ```json.\n\n"
-            f"Context:\n{context[:3000]}"
-        )
-        
-        llm = ChatGoogleGenerativeAI(
-            model="gemini-2.5-flash", 
-            google_api_key=os.getenv("GOOGLE_API_KEY"), 
-            temperature=0.7
-        )
-        
-        response = llm.invoke(prompt)
-        
-        # 3. Clean and parse the JSON response
-        clean_text = response.content.replace("```json", "").replace("```", "").strip()
-        questions = json.loads(clean_text)
-        
-        return {"questions": questions[:3]}
-        
-    except Exception as e:
-        print(f"⚠️ Recommendation generation failed: {str(e)}")
-        # Bulletproof fallback in case the LLM formatting hiccups
-        return {"questions": [
-            "Can you provide an executive summary of this project?", 
-            "What are the key metrics and data points?", 
-            "What insights can you draw from the uploaded documents?"
-        ]}
-'''
