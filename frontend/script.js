@@ -831,5 +831,6 @@ function askRecommendedQuestion(questionText) {
     sendChat();
 }
 */
+}
 
 document.addEventListener('DOMContentLoaded', initializeNexusDropdowns);
