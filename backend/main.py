@@ -379,8 +379,79 @@ async def chat(message: str = Form(...), project_id: int = Form(...), model: str
                             "name": name, 
                             "url": url_map.get(name, "#")
                         })
-        # --------------------------------------------------
 
         return {"answer": clean_answer, "sources": cited_sources}
     except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+    
+
+# Gitbook webhook
+@app.post("/webhooks/gitbook")
+async def gitbook_sync(request: Request):
+    """
+    Receives real-time updates from GitBook. 
+    Point your GitBook Webhook URL to: https://nexus-backend-two.vercel.app/webhooks/gitbook
+    """
+    try:
+        payload = await request.json()
+        
+        # Extract payload based on GitBook's webhook schema
+        action = payload.get("action") 
+        page_id = payload.get("page", {}).get("id")
+        title = payload.get("page", {}).get("title", "Untitled")
+        markdown_content = payload.get("page", {}).get("markdown", "")
+        page_url = payload.get("page", {}).get("urls", {}).get("public", "")
+        
+        GITBOOK_PROJECT_ID = 999 
+        
+        # 1. Purge old memory if the page was edited or deleted
+        if action in ["page.updated", "page.deleted"]:
+            supabase.table("project_documents") \
+                .delete() \
+                .eq("metadata->>source", page_id) \
+                .execute()
+                
+            if action == "page.deleted":
+                return {"status": "success", "message": f"Memory purged for deleted page: {title}"}
+        
+        # 2. Vectorize the new content directly into memory (No File Storage)
+        if action in ["page.created", "page.updated"] and markdown_content.strip():
+            doc = Document(
+                page_content=markdown_content,
+                metadata={
+                    "source": page_id,          
+                    "title": title,            
+                    "project_id": GITBOOK_PROJECT_ID, 
+                    "file_url": page_url        # Links directly back to GitBook
+                }
+            )
+            
+            text_splitter = RecursiveCharacterTextSplitter(chunk_size=1500, chunk_overlap=150)
+            chunks = text_splitter.split_documents([doc])
+            
+            embeddings = GoogleGenerativeAIEmbeddings(
+                model="gemini-embedding-001", 
+                google_api_key=os.getenv("GOOGLE_API_KEY"), 
+                transport="rest"
+            )
+            
+            texts = [chunk.page_content for chunk in chunks]
+            metadatas = [chunk.metadata for chunk in chunks]
+            
+            raw_vectors = embeddings.embed_documents(texts)
+            truncated_vectors = [vec[:1024] for vec in raw_vectors]
+            
+            records = [
+                {"content": t, "metadata": m, "embedding": v} 
+                for t, m, v in zip(texts, metadatas, truncated_vectors)
+            ]
+                
+            supabase.table("project_documents").insert(records).execute()
+            
+            return {"status": "success", "message": f"Successfully synced page: {title}"}
+
+        return {"status": "ignored", "message": "Unhandled action or empty content."}
+
+    except Exception as e:
+        print(f"GitBook Webhook Error: {str(e)}")
         raise HTTPException(status_code=500, detail=str(e))

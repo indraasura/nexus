@@ -1,4 +1,4 @@
-// Change this to your Render URL when deploying nexus-backend-two.vercel.app
+// Change this to your Render URL when deploying https://nexus-backend-two.vercel.app
 const API_URL = "https://nexus-backend-two.vercel.app";
 
 let authToken = null;
@@ -239,12 +239,14 @@ function appendMessage(role, text, sources = []) {
     let sourcesHtml = "";
     if (role === 'ai' && sources && sources.length > 0) {
         sourcesHtml = `<div class="sources-container"><div class="source-label">Documents referenced</div>`;
+        
+        let validSourcesFound = false;
 
         sources.forEach(src => {
-            // Check if URL is valid
             const url = (src.url && src.url !== "#") ? src.url : null;
 
             if (url) {
+                validSourcesFound = true;
                 sourcesHtml += `
                     <a href="${url}" 
                        target="_blank" 
@@ -258,14 +260,19 @@ function appendMessage(role, text, sources = []) {
                         <span class="pill-text">${src.name}</span>
                     </a>`;
             } else {
-                // If no URL found, show a disabled-looking pill
                 sourcesHtml += `
-                    <div class="source-pill disabled" style="opacity: 0.5; cursor: not-allowed;">
-                        <span class="pill-text">${src.name} (Link Missing)</span>
+                    <div class="source-pill disabled" style="opacity: 0.5; cursor: not-allowed;" title="File link unavailable">
+                        <span class="pill-text">${src.name}</span>
                     </div>`;
             }
         });
+        
         sourcesHtml += `</div>`;
+        
+        // If the array was passed but all URLs were broken, optionally hide the container
+        if (!validSourcesFound && sources.length === 0) {
+             sourcesHtml = "";
+        }
     }
 
     // 4. --- Inject HTML into Bubble ---
@@ -776,61 +783,6 @@ async function clearChat() {
             </div>`;
         return;
     }
-
-    // 1. Show the loading state
-    /*
-    chatContainer.innerHTML = `
-        <div class="welcome-screen">
-            <img src="./images/nexus_logo.gif" alt="Nexus" style="width: 72px; border-radius: 50%;">
-            <h2>Analyzing project context...</h2>
-            <div class="thinking-steps">
-                <div class="step-icon"></div> Generating recommended questions
-            </div>
-        </div>`;
-
-    // 2. Fetch the recommendations from the backend
-    try {
-        const res = await apiCall(`/projects/${projectId}/recommendations`, { method: 'GET' });
-        const data = await res.json();
-        
-        let cardsHtml = '';
-        data.questions.forEach(q => {
-            // Passing 'this.innerText' automatically grabs the question text when clicked
-            cardsHtml += `<div class="recommendation-card" onclick="askRecommendedQuestion(this.innerText)">${q}</div>`;
-        });
-        
-        // 3. Render the dynamic carousel
-        chatContainer.innerHTML = `
-            <div class="welcome-screen">
-                <img src="./images/nexus_logo.gif" alt="Nexus" style="width: 72px; border-radius: 50%;">
-                <h2>How can I help you today?</h2>
-                <div class="recommendation-carousel">
-                    ${cardsHtml}
-                </div>
-            </div>`;
-            
-    } catch (error) {
-        console.error("Failed to load recommendations:", error);
-        // Fallback UI if the API fails
-        chatContainer.innerHTML = `
-            <div class="welcome-screen">
-                <img src="./images/nexus_logo.gif" alt="Nexus" style="width: 72px; border-radius: 50%;">
-                <h2>How can I help you today?</h2>
-                <p style="color: var(--text-secondary);">Ask me anything about the uploaded documents.</p>
-            </div>`;
-    }
-}
-
-// Triggers exactly as if the user typed the question and clicked Send
-function askRecommendedQuestion(questionText) {
-    const input = document.getElementById('user-input');
-    input.value = questionText;
-    
-    // Clear the welcome screen and execute the chat
-    document.getElementById('chat-container').innerHTML = '';
-    sendChat();
-}
-*/
 }
 
 document.addEventListener('DOMContentLoaded', initializeNexusDropdowns);
